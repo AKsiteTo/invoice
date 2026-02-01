@@ -1,0 +1,2278 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>发票图片导出器</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .controls {
+            padding: 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #56ab2f 0%, #a8e6cf 100%);
+            color: white;
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(86, 171, 47, 0.4);
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #ff9a56 0%, #ff6b6b 100%);
+            color: white;
+        }
+
+        .btn-warning:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(255, 154, 86, 0.4);
+        }
+
+        .btn-info {
+            background: linear-gradient(135deg, #17a2b8 0%, #6f42c1 100%);
+            color: white;
+        }
+
+        .btn-info:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(23, 162, 184, 0.4);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .canvas-container {
+            padding: 30px;
+            display: flex;
+            justify-content: center;
+            background: #f8f9fa;
+        }
+
+        #canvas {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            background: white;
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+            image-rendering: high-quality;
+            max-width: 100%;
+            height: auto;
+        }
+
+        .status {
+            padding: 20px 30px;
+            text-align: center;
+            font-size: 16px;
+            color: #666;
+        }
+
+        .status.success {
+            color: #28a745;
+            background: #d4edda;
+            border-radius: 8px;
+            margin: 0 30px 30px 30px;
+        }
+
+        .status.error {
+            color: #dc3545;
+            background: #f8d7da;
+            border-radius: 8px;
+            margin: 0 30px 30px 30px;
+        }
+
+        .image-info {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 20px;
+            flex-wrap: wrap;
+            display: none;
+        }
+
+        .image-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            min-width: 150px;
+        }
+
+        .image-item img {
+            max-width: 100px;
+            max-height: 60px;
+            object-fit: contain;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+
+        .image-item p {
+            font-size: 12px;
+            color: #666;
+            margin: 5px 0;
+        }
+
+        .quality-selector {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 15px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .quality-selector label {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .quality-selector select {
+            padding: 8px 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+            transition: border-color 0.3s ease;
+        }
+
+        .quality-selector select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .quality-selector input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: #667eea;
+        }
+
+        .quality-info {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        @media (max-width: 768px) {
+            .button-group {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .btn {
+                width: 100%;
+                max-width: 300px;
+            }
+        }
+
+        /* 打印样式 */
+        @media print {
+            @page {
+                margin: 0 !important;
+                size: A4 !important;
+            }
+            
+            body {
+                background: white !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+            
+            .container {
+                box-shadow: none !important;
+                border-radius: 0 !important;
+                max-width: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            
+            .header,
+            .controls,
+            .status {
+                display: none !important;
+            }
+            
+            .canvas-container {
+                padding: 0 !important;
+                background: white !important;
+                margin: 0 !important;
+            }
+            
+            #canvas {
+                border: none !important;
+                box-shadow: none !important;
+                width: 100% !important;
+                height: auto !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            
+            /* 确保发票间隔和黑线在打印时正确显示 */
+            .invoice-separator {
+                background: white !important;
+                height: 20px !important;
+                width: 100% !important;
+                border-bottom: 3px solid black !important;
+            }
+        }
+        
+        /* 进度条样式 */
+        .progress-container {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+        
+        .progress-text {
+            font-size: 14px;
+            color: #666;
+            text-align: center;
+            font-weight: 500;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📄 文件导出器</h1>
+            <p>上传图片或PDF文件，自动排版为A4尺寸并导出</p>
+        </div>
+
+        <div class="controls">
+            <div class="button-group">
+                <input type="file" id="mainFileInput" accept="image/*,.pdf" multiple style="display: none;">
+                <input type="file" id="imageInput" accept="image/*" multiple style="display: none;">
+                <input type="file" id="pdfInput" accept="application/pdf" multiple style="display: none;">
+                <button class="btn btn-primary" onclick="document.getElementById('mainFileInput').click()">
+                    📁 选择初始文件
+                </button>
+                <button class="btn btn-success" onclick="document.getElementById('imageInput').click()">
+                    ➕ 续加图片
+                </button>
+                <button class="btn btn-success" onclick="document.getElementById('pdfInput').click()">
+                    📄 续加PDF
+                </button>
+                <button class="btn btn-primary" id="exportBtn" onclick="exportImage()" disabled>
+                    💾 导出图片
+                </button>
+                
+                <button class="btn btn-success" id="exportPdfBtn" onclick="exportPDF()" disabled>
+                    📋 导出PDF
+                </button>
+
+                <button class="btn btn-info" id="previewBtn" onclick="previewPrint()" disabled>
+                    👁️ 打印预览
+                </button>
+                <button class="btn btn-warning" onclick="clearCanvas()">
+                    🗑️ 清空画布
+                </button>
+                <button class="btn btn-primary" id="reprocessBtn" onclick="reprocessPDF()" style="display: none;">
+                    🔄 重新渲染PDF
+                </button>
+                <div class="pagination-controls" style="display: none; margin-top: 15px; text-align: center;"
+                    id="paginationControls">
+                    <button class="btn btn-info" onclick="prevPage()" id="prevPageBtn" disabled>
+                        ◀️ 上一页
+                    </button>
+                    <span style="margin: 0 15px; font-weight: bold;" id="pageInfo">第 1 页 / 共 1 页</span>
+                    <button class="btn btn-info" onclick="nextPage()" id="nextPageBtn" disabled>
+                        下一页 ▶️
+                </button>
+                </div>
+            </div>
+            <div class="image-info" id="imageInfo"></div>
+            <div class="quality-selector">
+                <label for="pdfQuality">PDF渲染质量:</label>
+                <select id="pdfQuality">
+                    <option value="2.0">标准 (2x)</option>
+                    <option value="3.0">高清 (3x)</option>
+                    <option value="4.0" selected>超清 (4x)</option>
+                    <option value="6.0">极清 (6x)</option>
+                    <option value="8.0">最高 (8x)</option>
+                </select>
+                <div class="quality-info" id="qualityInfo">当前质量: 4x</div>
+            </div>
+            <div class="quality-selector">
+                <label for="pdfExportQuality">PDF导出质量:</label>
+                <select id="pdfExportQuality">
+                    <option value="1.0">标准质量</option>
+                    <option value="1.5">高质量</option>
+                    <option value="2.0" selected>超高质量</option>
+                </select>
+                <div class="quality-info" id="pdfExportQualityInfo">当前PDF质量: 超高质量</div>
+            </div>
+            <div class="quality-selector">
+                <label for="autoCrop">自动裁剪空白:</label>
+                <input type="checkbox" id="autoCrop" checked>
+                <div class="quality-info">自动检测并裁剪PDF中的空白区域（某些发票可能需要关闭此选项）</div>
+            </div>
+            <div class="quality-selector">
+                <button class="btn btn-info" onclick="toggleDebugMode()" style="padding: 8px 16px; font-size: 14px;">
+                    🐛 调试模式
+                </button>
+                <div class="quality-info">开启后可在控制台查看详细的检测信息</div>
+            </div>
+            <div class="quality-selector">
+                <button class="btn btn-warning" onclick="clearCache()" style="padding: 8px 16px; font-size: 14px;">
+                    🗑️ 清理缓存
+                </button>
+                <div class="quality-info">清理PDF缓存和释放内存</div>
+            </div>
+            <div class="progress-container" id="progressContainer" style="display: none; margin: 15px 0;">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
+                </div>
+                <div class="progress-text" id="progressText">处理中...</div>
+            </div>
+        </div>
+
+        <div class="canvas-container">
+            <canvas id="canvas" width="2480" height="3508"></canvas>
+        </div>
+
+        <div class="status" id="status"></div>
+    </div>
+
+    <script>
+        // A4尺寸设置 (21cm x 29.7cm, 300 DPI 高清)
+        const A4_WIDTH = 2480;  // 21cm * 300 DPI / 2.54
+        const A4_HEIGHT = 3508; // 29.7cm * 300 DPI / 2.54
+        const SECTION_HEIGHT = A4_HEIGHT / 3; // 每张图片的高度
+        const INVOICE_SPACING = 20; // 发票之间的间隔距离（像素）
+        const INVOICE_LINE_HEIGHT = 3; // 分隔线高度（像素）
+        const MAX_IMAGES_PER_PAGE = 3; // 每页最多图片数量
+        const MAX_PAGES = 10; // 最多页数限制
+        
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const mainFileInput = document.getElementById('mainFileInput');
+        const imageInput = document.getElementById('imageInput');
+        const pdfInput = document.getElementById('pdfInput');
+        const exportBtn = document.getElementById('exportBtn');
+
+        const previewBtn = document.getElementById('previewBtn');
+        const status = document.getElementById('status');
+        const imageInfo = document.getElementById('imageInfo');
+        const pdfQualitySelect = document.getElementById('pdfQuality');
+        const qualityInfo = document.getElementById('qualityInfo');
+        const exportPdfBtn = document.getElementById('exportPdfBtn');
+
+        // 获取当前PDF渲染质量
+        function getPdfRenderScale() {
+            return parseFloat(pdfQualitySelect.value);
+        }
+
+        // 获取是否启用自动裁剪
+        function isAutoCropEnabled() {
+            return document.getElementById('autoCrop').checked;
+        }
+
+        // 获取PDF导出质量
+        function getPdfExportQuality() {
+            return parseFloat(document.getElementById('pdfExportQuality').value);
+        }
+
+        // 切换调试模式
+        function toggleDebugMode() {
+            debugMode = !debugMode;
+            if (debugMode) {
+                showStatus('调试模式已开启，请查看浏览器控制台', 'info');
+                console.log('=== 发票检测调试模式已开启 ===');
+                console.log('将显示详细的PDF处理和内容检测信息');
+            } else {
+                showStatus('调试模式已关闭', 'info');
+                console.log('=== 发票检测调试模式已关闭 ===');
+            }
+        }
+        
+        // 进度条管理
+        const progressBar = {
+            container: document.getElementById('progressContainer'),
+            fill: document.getElementById('progressFill'),
+            text: document.getElementById('progressText'),
+            
+            show() {
+                this.container.style.display = 'block';
+            },
+            
+            hide() {
+                this.container.style.display = 'none';
+            },
+            
+            update(percent, message) {
+                this.fill.style.width = percent + '%';
+                this.text.textContent = message;
+            },
+            
+            increment(increment, message) {
+                const currentWidth = parseFloat(this.fill.style.width) || 0;
+                const newWidth = Math.min(100, currentWidth + increment);
+                this.update(newWidth, message);
+            }
+        };
+        
+        // 防抖函数
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+        
+        // 清理缓存
+        function clearCache() {
+            performanceMonitor.start('缓存清理');
+            
+            // 清理PDF缓存
+            pdfCache.clear();
+            
+            // 清理图片缓存
+            memoryManager.clearImageCache();
+            
+            // 优化canvas
+            memoryManager.optimizeCanvas();
+            
+            // 强制垃圾回收
+            performanceMonitor.cleanup();
+            
+            // 检查内存
+            const memory = performanceMonitor.checkMemory();
+            
+            performanceMonitor.end('缓存清理');
+            
+            showStatus(`缓存清理完成，当前内存使用: ${memory ? memory.used + 'MB' : '未知'}`, 'success');
+            
+            if (debugMode) {
+                console.log('🧹 缓存清理完成');
+            }
+        }
+        
+        // 优化的状态显示（防抖）
+        const debouncedShowStatus = debounce((message, type = 'info') => {
+            showStatus(message, type);
+        }, 100);
+
+        // 更新质量信息显示
+        function updateQualityInfo() {
+            const scale = getPdfRenderScale();
+            qualityInfo.textContent = `当前质量: ${scale}x`;
+        }
+
+        // 更新PDF导出质量信息显示
+        function updatePdfExportQualityInfo() {
+            const quality = getPdfExportQuality();
+            const qualityText = quality === 1.0 ? '标准质量' : quality === 1.5 ? '高质量' : '超高质量';
+            document.getElementById('pdfExportQualityInfo').textContent = `当前PDF质量: ${qualityText}`;
+        }
+
+        // 监听质量选择变化
+        pdfQualitySelect.addEventListener('change', updateQualityInfo);
+        document.getElementById('pdfExportQuality').addEventListener('change', updatePdfExportQualityInfo);
+
+        let uploadedImages = [];
+        let uploadedPdfs = [];
+        let currentPdfFiles = []; // 保存当前PDF文件数组
+        let currentPage = 0; // 当前显示页
+        let totalPages = 1; // 总页数
+        let debugMode = false; // 调试模式开关
+        
+        // 性能监控
+        const performanceMonitor = {
+            startTime: 0,
+            memoryUsage: [],
+            
+            start(operation) {
+                this.startTime = performance.now();
+                if (debugMode) {
+                    console.log(`🚀 开始 ${operation}`);
+                }
+            },
+            
+            end(operation) {
+                const duration = performance.now() - this.startTime;
+                if (debugMode) {
+                    console.log(`✅ ${operation} 完成，耗时: ${duration.toFixed(2)}ms`);
+                }
+                return duration;
+            },
+            
+            checkMemory() {
+                if (performance.memory) {
+                    const memory = {
+                        used: Math.round(performance.memory.usedJSHeapSize / 1024 / 1024),
+                        total: Math.round(performance.memory.totalJSHeapSize / 1024 / 1024),
+                        limit: Math.round(performance.memory.jsHeapSizeLimit / 1024 / 1024)
+                    };
+                    
+                    if (debugMode) {
+                        console.log(`💾 内存使用: ${memory.used}MB / ${memory.total}MB (限制: ${memory.limit}MB)`);
+                    }
+                    
+                    this.memoryUsage.push(memory);
+                    return memory;
+                }
+                return null;
+            },
+            
+            cleanup() {
+                // 强制垃圾回收（如果可用）
+                if (window.gc) {
+                    window.gc();
+                    if (debugMode) {
+                        console.log('🗑️ 执行垃圾回收');
+                    }
+                }
+            }
+        };
+        
+        // 内存管理工具
+        const memoryManager = {
+            maxCacheSize: 50 * 1024 * 1024, // 50MB缓存限制
+            
+            clearImageCache() {
+                // 清理未使用的图片缓存
+                uploadedImages = uploadedImages.filter((img, index) => {
+                    const keep = index < currentPage * MAX_IMAGES_PER_PAGE + MAX_IMAGES_PER_PAGE;
+                    if (!keep && img.src) {
+                        URL.revokeObjectURL(img.src);
+                    }
+                    return keep;
+                });
+                
+                if (debugMode) {
+                    console.log('🧹 清理图片缓存');
+                }
+            },
+            
+            optimizeCanvas() {
+                // 优化canvas内存使用
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = canvas.width;
+                tempCanvas.height = canvas.height;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.drawImage(canvas, 0, 0);
+                
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(tempCanvas, 0, 0);
+                
+                if (debugMode) {
+                    console.log('🎨 优化canvas内存');
+                }
+            }
+        };
+
+        // 设置PDF.js worker路径和CMap配置
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        
+        // 配置CMap以支持中文等非ASCII字符（多个备用CDN源）
+        const cMapUrls = [
+            'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/',
+            'https://unpkg.com/pdfjs-dist@3.11.174/cmaps/',
+            'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/'
+        ];
+        
+        // 使用第一个可用的CDN源
+        pdfjsLib.cMapUrl = cMapUrls[0];
+        pdfjsLib.cMapPacked = true;
+
+        // 初始化画布
+        function initCanvas() {
+            // 设置canvas的实际像素尺寸（300 DPI）
+            canvas.width = A4_WIDTH;
+            canvas.height = A4_HEIGHT;
+            
+            // 设置canvas的CSS显示尺寸（缩放到适合屏幕）
+            const displayScale = Math.min(window.innerWidth / A4_WIDTH * 0.8, 1);
+            canvas.style.width = (A4_WIDTH * displayScale) + 'px';
+            canvas.style.height = (A4_HEIGHT * displayScale) + 'px';
+            
+            // 重置变换矩阵
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            
+            // 启用最高质量渲染
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.textRenderingOptimization = 'optimizeQuality';
+            
+            // 设置高质量渲染参数
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, A4_WIDTH, A4_HEIGHT);
+            
+            // 绘制发票间隔和黑线
+            for (let i = 1; i < 3; i++) {
+                const y = i * SECTION_HEIGHT;
+                
+                // 绘制间隔区域（白色背景）
+                ctx.fillStyle = 'white';
+                ctx.fillRect(0, y - INVOICE_SPACING/2, A4_WIDTH, INVOICE_SPACING);
+                
+                // 绘制黑线
+                ctx.strokeStyle = 'black';
+                ctx.lineWidth = INVOICE_LINE_HEIGHT;
+                ctx.setLineDash([]); // 实线
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(A4_WIDTH, y);
+                ctx.stroke();
+            }
+        }
+
+        // 显示状态信息
+        function showStatus(message, type = 'info') {
+            status.textContent = message;
+            status.className = `status ${type}`;
+        }
+
+        // 更新图片信息显示
+        function updateImageInfo() {
+            imageInfo.innerHTML = '';
+            
+            // 显示图片信息
+            uploadedImages.forEach((img, index) => {
+                const item = document.createElement('div');
+                item.className = 'image-item';
+                
+                const preview = document.createElement('img');
+                preview.src = img.src;
+                preview.alt = `图片 ${index + 1}`;
+                
+                const info = document.createElement('p');
+                info.textContent = `图片 ${index + 1}: ${img.naturalWidth} × ${img.naturalHeight}`;
+                
+                item.appendChild(preview);
+                item.appendChild(info);
+                imageInfo.appendChild(item);
+            });
+
+            // 显示PDF信息
+            uploadedPdfs.forEach((pdfData, index) => {
+                const item = document.createElement('div');
+                item.className = 'image-item';
+                
+                const preview = document.createElement('img');
+                preview.src = pdfData.preview;
+                preview.alt = `PDF ${index + 1}`;
+                
+                const info = document.createElement('p');
+                info.textContent = `PDF ${index + 1}: ${pdfData.width} × ${pdfData.height}`;
+                
+                const fileName = document.createElement('p');
+                fileName.textContent = pdfData.fileName || `文件 ${index + 1}`;
+                fileName.style.fontSize = '10px';
+                fileName.style.color = '#666';
+                fileName.style.fontWeight = 'bold';
+                
+                const pageInfo = document.createElement('p');
+                pageInfo.textContent = `页面: ${pdfData.pageNumber}`;
+                pageInfo.style.fontSize = '10px';
+                pageInfo.style.color = '#999';
+                
+                // 显示裁剪信息
+                if (pdfData.originalSize && pdfData.croppedSize) {
+                    const cropInfo = document.createElement('p');
+                    cropInfo.textContent = `原始: ${pdfData.originalSize}`;
+                    cropInfo.style.fontSize = '9px';
+                    cropInfo.style.color = '#999';
+                    
+                    const finalInfo = document.createElement('p');
+                    finalInfo.textContent = `裁剪: ${pdfData.croppedSize}`;
+                    finalInfo.style.fontSize = '9px';
+                    finalInfo.style.color = '#28a745';
+                    finalInfo.style.fontWeight = 'bold';
+                    
+                    item.appendChild(cropInfo);
+                    item.appendChild(finalInfo);
+                }
+                
+                item.appendChild(preview);
+                item.appendChild(info);
+                item.appendChild(fileName);
+                item.appendChild(pageInfo);
+                imageInfo.appendChild(item);
+            });
+        }
+
+        // --- NEW EVENT LISTENERS ---
+
+        // 1. Main File Input (Clear and Load)
+        mainFileInput.addEventListener('change', async function (e) {
+            const files = Array.from(e.target.files);
+            if (files.length === 0) {
+                mainFileInput.value = ''; // Reset input if no file is chosen
+                return; // Do nothing if no files are selected
+            }
+
+            clearCanvas(); // Clear everything only after confirming file selection
+            await handleFiles(files);
+            mainFileInput.value = ''; // Reset input
+        });
+
+        // 2. Add Image Input (Append Only)
+        imageInput.addEventListener('change', async function (e) {
+            const files = Array.from(e.target.files);
+            if (files.length === 0) return;
+            await handleFiles(files, false, true); // Process images only
+            imageInput.value = ''; // Reset input
+        });
+
+        // 3. Add PDF Input (Append Only)
+        pdfInput.addEventListener('change', async function (e) {
+            const files = Array.from(e.target.files);
+            if (files.length === 0) return;
+            await handleFiles(files, true, false); // Process PDFs only
+            pdfInput.value = ''; // Reset input
+        });
+
+        // Universal file handler function
+        async function handleFiles(files, processPdf = true, processImage = true) {
+            // 检查总文件数量限制
+            const totalAfterUpload = uploadedImages.length + files.length;
+            const maxTotalFiles = MAX_IMAGES_PER_PAGE * MAX_PAGES;
+            if (totalAfterUpload > maxTotalFiles) {
+                showStatus(`最多只能处理${maxTotalFiles}个文件，当前已有${uploadedImages.length}个`, 'error');
+                return;
+            }
+
+            // 分离图片和PDF文件
+            const imageFiles = processImage ? files.filter(file => file.type.startsWith('image/')) : [];
+            const pdfFiles = processPdf ? files.filter(file => file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) : [];
+
+            // 处理图片文件
+            if (imageFiles.length > 0) {
+                await processImageFiles(imageFiles);
+            }
+
+            // 处理PDF文件
+            if (pdfFiles.length > 0) {
+                currentPdfFiles.push(...pdfFiles); // Append to current PDF files for reprocessing
+                await processMultiplePDFs(pdfFiles);
+            }
+        }
+
+        // 重新处理PDF (增强版)
+        async function reprocessPDF() {
+            // 从 uploadedPdfs 中收集所有原始PDF文件，并去重
+            const uniquePdfFiles = [...new Set(uploadedPdfs.map(p => p.sourceFile).filter(Boolean))];
+
+            if (uniquePdfFiles.length > 0) {
+                // 找到第一个由PDF转换来的图片在 uploadedImages 中的索引
+                const firstPdfImageIndex = uploadedImages.findIndex((img, index) => uploadedPdfs[index] && uploadedPdfs[index].sourceFile);
+
+                if (firstPdfImageIndex !== -1) {
+                    // 从该索引开始，移除所有旧的PDF图片和数据
+                    uploadedImages.splice(firstPdfImageIndex);
+                    uploadedPdfs.splice(0); // 清空PDF数据数组
+                    currentPdfFiles = []; // 清空临时数组
+
+                    showStatus(`正在使用新设置重新处理 ${uniquePdfFiles.length} 个PDF...`, 'info');
+                    // 使用收集到的所有唯一PDF文件进行重新处理
+                    await processMultiplePDFs(uniquePdfFiles);
+                } else {
+                    showStatus('未找到可重新处理的PDF图片。', 'warning');
+                }
+            } else {
+                showStatus('没有已加载的PDF文件可供重新处理。', 'info');
+            }
+        }
+
+        // 检测图片中的空白区域
+        function detectContentBounds(canvas, threshold = 0.95) {
+            const ctx = canvas.getContext('2d');
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+            
+            let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0;
+            let hasContent = false;
+            let totalBrightness = 0;
+            let pixelCount = 0;
+            
+            // 首先计算整体亮度分布
+            for (let y = 0; y < canvas.height; y++) {
+                for (let x = 0; x < canvas.width; x++) {
+                    const index = (y * canvas.width + x) * 4;
+                    const r = data[index];
+                    const g = data[index + 1];
+                    const b = data[index + 2];
+                    const brightness = (r + g + b) / 3;
+                    totalBrightness += brightness;
+                    pixelCount++;
+                }
+            }
+            
+            const avgBrightness = totalBrightness / pixelCount;
+            if (debugMode) {
+                console.log('=== 内容检测调试信息 ===');
+                console.log('画布尺寸:', canvas.width, 'x', canvas.height);
+                console.log('总像素数:', pixelCount);
+                console.log('平均亮度:', avgBrightness.toFixed(2));
+            }
+            
+            // 根据平均亮度动态调整白色阈值
+            const whiteThreshold = Math.max(240, avgBrightness + 30);
+            if (debugMode) {
+                console.log('白色阈值:', whiteThreshold);
+            }
+            
+            // 重新遍历像素数据，寻找非白色像素
+            for (let y = 0; y < canvas.height; y++) {
+                for (let x = 0; x < canvas.width; x++) {
+                    const index = (y * canvas.width + x) * 4;
+                    const r = data[index];
+                    const g = data[index + 1];
+                    const b = data[index + 2];
+                    const a = data[index + 3];
+                    
+                    // 跳过完全透明的像素
+                    if (a === 0) continue;
+                    
+                    const brightness = (r + g + b) / 3;
+                    
+                    // 更智能的内容检测：
+                    // 1. 亮度低于阈值
+                    // 2. 或者RGB值差异较大（彩色内容）
+                    // 3. 或者有明显的对比度变化
+                    const hasLowBrightness = brightness < whiteThreshold;
+                    const hasColorVariation = Math.abs(r - g) > 15 || Math.abs(g - b) > 15 || Math.abs(r - b) > 15;
+                    const isDarkContent = (r < 200 && g < 200 && b < 200);
+                    
+                    if (hasLowBrightness || hasColorVariation || isDarkContent) {
+                        hasContent = true;
+                        minX = Math.min(minX, x);
+                        minY = Math.min(minY, y);
+                        maxX = Math.max(maxX, x);
+                        maxY = Math.max(maxY, y);
+                    }
+                }
+            }
+            
+            if (!hasContent) {
+                if (debugMode) {
+                    console.log('未检测到内容，返回完整画布');
+                }
+                return null; // 没有检测到内容，返回null表示不裁剪
+            }
+            
+            // 添加一些边距
+            const margin = 15;
+            const bounds = {
+                x: Math.max(0, minX - margin),
+                y: Math.max(0, minY - margin),
+                width: Math.min(canvas.width - minX, maxX - minX + 2 * margin),
+                height: Math.min(canvas.height - minY, maxY - minY + 2 * margin)
+            };
+            
+            if (debugMode) {
+                console.log('检测到的内容边界:', bounds);
+                console.log('内容区域占比:', ((bounds.width * bounds.height) / (canvas.width * canvas.height) * 100).toFixed(2) + '%');
+            }
+            return bounds;
+        }
+
+        // 备用内容检测方法（更宽松的检测条件）
+        function detectContentBoundsRelaxed(canvas) {
+            const ctx = canvas.getContext('2d');
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+            
+            let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0;
+            let hasContent = false;
+            
+            // 使用非常宽松的检测条件
+            for (let y = 0; y < canvas.height; y++) {
+                for (let x = 0; x < canvas.width; x++) {
+                    const index = (y * canvas.width + x) * 4;
+                    const r = data[index];
+                    const g = data[index + 1];
+                    const b = data[index + 2];
+                    const a = data[index + 3];
+                    
+                    // 跳过完全透明的像素
+                    if (a === 0) continue;
+                    
+                    // 非常宽松的条件：只要不是接近纯白色就认为是内容
+                    const isNearWhite = (r > 245 && g > 245 && b > 245);
+                    
+                    if (!isNearWhite) {
+                        hasContent = true;
+                        minX = Math.min(minX, x);
+                        minY = Math.min(minY, y);
+                        maxX = Math.max(maxX, x);
+                        maxY = Math.max(maxY, y);
+                    }
+                }
+            }
+            
+            if (!hasContent) {
+                console.log('备用检测：未检测到内容');
+                return null;
+            }
+            
+            // 添加较大的边距
+            const margin = 25;
+            const bounds = {
+                x: Math.max(0, minX - margin),
+                y: Math.max(0, minY - margin),
+                width: Math.min(canvas.width - minX, maxX - minX + 2 * margin),
+                height: Math.min(canvas.height - minY, maxY - minY + 2 * margin)
+            };
+            
+            console.log('备用检测到的内容边界:', bounds);
+            return bounds;
+        }
+
+        // 裁剪图片到内容区域
+        function cropToContent(canvas, bounds) {
+            if (!bounds) return canvas;
+            
+            const croppedCanvas = document.createElement('canvas');
+            const croppedCtx = croppedCanvas.getContext('2d');
+            
+            croppedCanvas.width = bounds.width;
+            croppedCanvas.height = bounds.height;
+            
+            // 绘制裁剪后的内容
+            croppedCtx.drawImage(
+                canvas,
+                bounds.x, bounds.y, bounds.width, bounds.height,
+                0, 0, bounds.width, bounds.height
+            );
+            
+            return croppedCanvas;
+        }
+
+        // PDF处理缓存
+        const pdfCache = new Map();
+        
+        // 检测图像中是否已有红色边框
+        async function checkForRedBorder(canvas) {
+            const ctx = canvas.getContext('2d');
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+            
+            const borderWidth = Math.min(20, Math.min(canvas.width, canvas.height) / 10); // 边框检测宽度
+            let redPixelCount = 0;
+            let totalBorderPixels = 0;
+            
+            // 检查上边框
+            for (let x = 0; x < canvas.width; x++) {
+                for (let y = 0; y < borderWidth; y++) {
+                    const index = (y * canvas.width + x) * 4;
+                    const r = data[index];
+                    const g = data[index + 1];
+                    const b = data[index + 2];
+                    
+                    totalBorderPixels++;
+                    // 检测红色像素 (R值高，G和B值低)
+                    if (r > 150 && g < 100 && b < 100) {
+                        redPixelCount++;
+                    }
+                }
+            }
+            
+            // 检查下边框
+            for (let x = 0; x < canvas.width; x++) {
+                for (let y = canvas.height - borderWidth; y < canvas.height; y++) {
+                    const index = (y * canvas.width + x) * 4;
+                    const r = data[index];
+                    const g = data[index + 1];
+                    const b = data[index + 2];
+                    
+                    totalBorderPixels++;
+                    if (r > 150 && g < 100 && b < 100) {
+                        redPixelCount++;
+                    }
+                }
+            }
+            
+            // 检查左边框
+            for (let x = 0; x < borderWidth; x++) {
+                for (let y = 0; y < canvas.height; y++) {
+                    const index = (y * canvas.width + x) * 4;
+                    const r = data[index];
+                    const g = data[index + 1];
+                    const b = data[index + 2];
+                    
+                    totalBorderPixels++;
+                    if (r > 150 && g < 100 && b < 100) {
+                        redPixelCount++;
+                    }
+                }
+            }
+            
+            // 检查右边框
+            for (let x = canvas.width - borderWidth; x < canvas.width; x++) {
+                for (let y = 0; y < canvas.height; y++) {
+                    const index = (y * canvas.width + x) * 4;
+                    const r = data[index];
+                    const g = data[index + 1];
+                    const b = data[index + 2];
+                    
+                    totalBorderPixels++;
+                    if (r > 150 && g < 100 && b < 100) {
+                        redPixelCount++;
+                    }
+                }
+            }
+            
+            const redPixelRatio = redPixelCount / totalBorderPixels;
+            
+            if (debugMode) {
+                console.log(`红色边框检测: 红色像素 ${redPixelCount}/${totalBorderPixels}, 比例: ${(redPixelRatio * 100).toFixed(2)}%`);
+            }
+            
+            // 如果红色像素占比超过10%，认为有红色边框
+            return redPixelRatio > 0.1;
+        }
+
+        // 为图像添加红色边框
+        function addRedBorder(canvas) {
+            const newCanvas = document.createElement('canvas');
+            const newCtx = newCanvas.getContext('2d');
+            
+            // 设置新画布尺寸（添加边框空间）
+            const borderSize = Math.max(10, Math.min(canvas.width, canvas.height) * 0.02); // 边框厚度
+            newCanvas.width = canvas.width + 2 * borderSize;
+            newCanvas.height = canvas.height + 2 * borderSize;
+            
+            // 填充白色背景
+            newCtx.fillStyle = 'white';
+            newCtx.fillRect(0, 0, newCanvas.width, newCanvas.height);
+            
+            // 绘制红色边框
+            newCtx.strokeStyle = '#FF0000'; // 鲜红色
+            newCtx.lineWidth = borderSize;
+            newCtx.strokeRect(borderSize / 2, borderSize / 2, canvas.width + borderSize, canvas.height + borderSize);
+            
+            // 绘制原始图像
+            newCtx.drawImage(canvas, borderSize, borderSize, canvas.width, canvas.height);
+            
+            if (debugMode) {
+                console.log(`已添加红色边框，边框厚度: ${borderSize}px`);
+            }
+            
+            return newCanvas;
+        }
+
+        // 检测数字签名PDF
+        async function checkDigitalSignature(pdf) {
+            try {
+                // 检查PDF元数据
+                const metadata = await pdf.getMetadata();
+                
+                // 检查是否有签名信息
+                if (metadata.info && metadata.info.Subject) {
+                    const subject = metadata.info.Subject.toLowerCase();
+                    if (subject.includes('signature') || subject.includes('signed') || subject.includes('签名')) {
+                        return true;
+                    }
+                }
+                
+                // 检查PDF权限
+                if (pdf.loadingTask && pdf.loadingTask._worker) {
+                    try {
+                        const permissions = await pdf.getPermissions();
+                        if (permissions && !permissions.print) {
+                            return true; // 限制打印的通常是签名PDF
+                        }
+                    } catch (permError) {
+                        // 如果无法获取权限，可能是签名PDF
+                        return true;
+                    }
+                }
+                
+                // 检查是否包含acroform字段（签名通常使用表单字段）
+                try {
+                    const numPages = pdf.numPages;
+                    for (let i = 1; i <= Math.min(numPages, 3); i++) { // 只检查前3页
+                        const page = await pdf.getPage(i);
+                        const annotations = await page.getAnnotations();
+                        
+                        for (const annotation of annotations) {
+                            if (annotation.subtype === 'Widget' && 
+                                (annotation.fieldType === 'Sig' || annotation.fieldName.toLowerCase().includes('sign'))) {
+                                return true;
+                            }
+                        }
+                    }
+                } catch (annotError) {
+                    // 如果无法获取注释，可能是签名PDF
+                    return true;
+                }
+                
+                return false;
+                
+            } catch (error) {
+                if (debugMode) {
+                    console.log('数字签名检测失败:', error.message);
+                }
+                // 如果检测过程出错，保守判断可能是签名PDF
+                return true;
+            }
+        }
+        
+        // 处理多个PDF文件（优化版）
+        async function processMultiplePDFs(files) {
+            performanceMonitor.start('PDF批量处理');
+            performanceMonitor.checkMemory();
+            
+            try {
+                progressBar.show();
+                progressBar.update(0, `准备处理 ${files.length} 个PDF文件...`);
+                
+                // 检查剩余槽位
+                const remainingSlots = MAX_IMAGES_PER_PAGE * MAX_PAGES - uploadedImages.length;
+                if (remainingSlots <= 0) {
+                    showStatus(`已达到最多${MAX_IMAGES_PER_PAGE * MAX_PAGES}个文件的限制。如需继续，请先清空画布。`, 'error');
+                    return;
+                }
+
+                // 只处理能容纳的文件数量
+                const filesToProcess = files.slice(0, Math.max(0, remainingSlots));
+                if (filesToProcess.length < files.length) {
+                    showStatus(`本次最多还能添加 ${remainingSlots} 个文件（总计不超过${MAX_IMAGES_PER_PAGE * MAX_PAGES}个）`, 'info');
+                }
+                
+                const renderScale = getPdfRenderScale();
+                const startIndex = uploadedImages.length; // 记录新增文件的起始位置
+                
+                // 并发处理PDF文件（限制并发数为3）
+                const concurrencyLimit = 3;
+                const chunks = [];
+                for (let i = 0; i < filesToProcess.length; i += concurrencyLimit) {
+                    chunks.push(filesToProcess.slice(i, i + concurrencyLimit));
+                }
+                
+                let processedCount = 0;
+                const progressIncrement = 100 / filesToProcess.length;
+                
+                for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+                    const chunk = chunks[chunkIndex];
+                    
+                    // 并发处理当前批次
+                    const promises = chunk.map(async (file, index) => {
+                        const globalIndex = startIndex + filesToProcess.indexOf(file);
+                        return await processSinglePDF(file, globalIndex, renderScale, chunkIndex);
+                    });
+                    
+                    // 等待当前批次完成
+                    const results = await Promise.allSettled(promises);
+                    
+                    // 处理结果
+                    for (const result of results) {
+                        if (result.status === 'fulfilled') {
+                            processedCount++;
+                            progressBar.increment(progressIncrement, `已处理 ${processedCount}/${filesToProcess.length} 个PDF文件...`);
+                        } else {
+                            console.error('PDF处理失败:', result.reason);
+                            debouncedShowStatus(`PDF处理失败: ${result.reason.message}`, 'error');
+                        }
+                    }
+                    
+                    // 批次间短暂休息，避免阻塞UI
+                    await new Promise(resolve => setTimeout(resolve, 50));
+                }
+                
+                // 完成处理
+                if (processedCount === filesToProcess.length) {
+                    progressBar.update(100, '处理完成，正在更新界面...');
+                    
+                    // 更新总页数
+                    totalPages = Math.ceil(uploadedImages.length / MAX_IMAGES_PER_PAGE);
+
+                    // 显示或隐藏分页控件
+                    const paginationControls = document.getElementById('paginationControls');
+                    if (totalPages > 1) {
+                        paginationControls.style.display = 'block';
+                        updatePaginationButtons();
+                        updatePageInfo();
+                    }
+
+                    drawCurrentPage();
+                    updateImageInfo();
+                    exportBtn.disabled = false;
+                    exportPdfBtn.disabled = false;
+                    previewBtn.disabled = false;
+                    document.getElementById('reprocessBtn').style.display = 'inline-flex';
+                    
+                    performanceMonitor.end('PDF批量处理');
+                    performanceMonitor.checkMemory();
+                    performanceMonitor.cleanup();
+                    
+                    progressBar.hide();
+                    showStatus(`成功处理 ${filesToProcess.length} 个PDF文件，渲染质量: ${renderScale}x，共 ${totalPages} 页`, 'success');
+                } else {
+                    progressBar.hide();
+                    showStatus(`部分处理完成：${processedCount}/${filesToProcess.length} 个PDF文件`, 'warning');
+                }
+                
+            } catch (error) {
+                progressBar.hide();
+                showStatus('PDF处理失败，请检查文件格式或尝试关闭自动裁剪', 'error');
+                console.error('PDF processing error:', error);
+                
+                // 如果是CMap错误，提供具体的解决建议
+                if (error.message && error.message.includes('CMap')) {
+                    showStatus('PDF字体加载失败，建议：1) 开启调试模式查看详情 2) 尝试关闭自动裁剪', 'warning');
+                }
+            }
+        }
+        
+        // 处理单个PDF文件
+        async function processSinglePDF(file, targetIndex, renderScale, chunkIndex) {
+            performanceMonitor.start(`PDF处理 ${targetIndex + 1}`);
+            
+            try {
+                console.log(`处理PDF ${targetIndex + 1}: ${file.name}`);
+                
+                // 检查缓存
+                const cacheKey = `${file.name}_${file.size}_${renderScale}`;
+                if (pdfCache.has(cacheKey)) {
+                    if (debugMode) {
+                        console.log(`📦 使用缓存: ${file.name}`);
+                    }
+                    return pdfCache.get(cacheKey);
+                }
+                
+                const arrayBuffer = await file.arrayBuffer();
+                
+                // 尝试多个CDN源加载PDF
+                let pdf = null;
+                
+                for (let cMapIndex = 0; cMapIndex < cMapUrls.length; cMapIndex++) {
+                    const cMapUrl = cMapUrls[cMapIndex];
+                    const standardFontUrl = cMapUrl.replace('/cmaps/', '/standard_fonts/');
+                    
+                    try {
+                        if (debugMode) {
+                            console.log(`PDF ${targetIndex + 1} 尝试使用CDN源 ${cMapIndex + 1}: ${cMapUrl}`);
+                        }
+                        
+                        const loadingTask = pdfjsLib.getDocument({
+                            data: arrayBuffer,
+                            cMapUrl: cMapUrl,
+                            cMapPacked: true,
+                            standardFontDataUrl: standardFontUrl,
+                            disableFontFace: false,
+                            disableAutoFetch: false,
+                            disableStream: false,
+                            // 支持数字签名PDF的选项
+                            disableRange: false,
+                            disableCreateObjectURL: false,
+                            enableXfa: true,
+                            isEvalSupported: true,
+                            // 尝试绕过签名验证
+                            password: undefined, // 如果有密码保护
+                            // 增强渲染支持
+                            useSystemFonts: true,
+                            useWorkerFetch: true
+                        });
+                        
+                        pdf = await loadingTask.promise;
+                        if (debugMode) {
+                            console.log(`PDF ${targetIndex + 1} CDN ${cMapIndex + 1} 加载成功`);
+                        }
+                        break;
+                        
+                    } catch (error) {
+                        console.warn(`PDF ${targetIndex + 1} CDN ${cMapIndex + 1} 加载失败:`, error.message);
+                    }
+                }
+                
+                // 备用方案
+                if (!pdf) {
+                    const fallbackTask = pdfjsLib.getDocument({
+                        data: arrayBuffer,
+                        disableFontFace: false, // 改为false以支持更多字体
+                        disableAutoFetch: false, // 改为false
+                        disableStream: false, // 改为false
+                        // 添加数字签名支持
+                        enableXfa: true,
+                        isEvalSupported: true,
+                        useSystemFonts: true
+                    });
+                    
+                    pdf = await fallbackTask.promise;
+                }
+                
+                // 渲染页面
+                const page = await pdf.getPage(1);
+                const viewport = page.getViewport({ scale: renderScale });
+                
+                // 检测是否为数字签名PDF
+                const isDigitalSigned = await checkDigitalSignature(pdf);
+                if (isDigitalSigned) {
+                    if (debugMode) {
+                        console.log(`PDF ${targetIndex + 1} 检测到数字签名，使用特殊渲染模式`);
+                    }
+                    // 给用户一个友好的提示
+                    if (targetIndex === 0) { // 只在第一个PDF时提示一次
+                        showStatus('检测到数字签名PDF，正在使用增强渲染模式。如果红色边框不显示，请尝试关闭自动裁剪选项。', 'info');
+                    }
+                }
+                
+                const tempCanvas = document.createElement('canvas');
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCanvas.width = viewport.width;
+                tempCanvas.height = viewport.height;
+                
+                tempCtx.imageSmoothingEnabled = true;
+                tempCtx.imageSmoothingQuality = 'high';
+                tempCtx.textRenderingOptimization = 'optimizeQuality';
+                tempCtx.fillStyle = 'white';
+                tempCtx.fillRect(0, 0, viewport.width, viewport.height);
+                
+                // 尝试多种渲染方式以支持数字签名PDF
+                let renderSuccess = false;
+                const renderIntents = ['display', 'print', undefined]; // 尝试不同的渲染意图
+                
+                for (const intent of renderIntents) {
+                    try {
+                        const renderParams = {
+                            canvasContext: tempCtx,
+                            viewport: viewport,
+                            background: 'white'
+                        };
+                        
+                        // 只有在intent不是undefined时才添加
+                        if (intent !== undefined) {
+                            renderParams.intent = intent;
+                        }
+                        
+                        if (debugMode) {
+                            console.log(`PDF ${targetIndex + 1} 尝试渲染意图: ${intent || 'default'}`);
+                        }
+                        
+                        await page.render(renderParams).promise;
+                        renderSuccess = true;
+                        
+                        if (debugMode) {
+                            console.log(`PDF ${targetIndex + 1} 渲染成功，使用意图: ${intent || 'default'}`);
+                        }
+                        break;
+                        
+                    } catch (renderError) {
+                        if (debugMode) {
+                            console.warn(`PDF ${targetIndex + 1} 渲染意图 ${intent || 'default'} 失败:`, renderError.message);
+                        }
+                        continue;
+                    }
+                }
+                
+                // 如果所有渲染意图都失败，尝试最基础的渲染
+                if (!renderSuccess) {
+                    try {
+                        if (debugMode) {
+                            console.log(`PDF ${targetIndex + 1} 使用最基础渲染方式`);
+                        }
+                        
+                        await page.render({
+                            canvasContext: tempCtx,
+                            viewport: viewport
+                        }).promise;
+                        
+                        renderSuccess = true;
+                        
+                        if (debugMode) {
+                            console.log(`PDF ${targetIndex + 1} 基础渲染成功`);
+                        }
+                        
+                    } catch (basicRenderError) {
+                        if (debugMode) {
+                            console.error(`PDF ${targetIndex + 1} 所有渲染方式都失败:`, basicRenderError.message);
+                        }
+                        throw basicRenderError;
+                    }
+                }
+                
+                // 内容检测
+                let contentBounds = null;
+                if (isAutoCropEnabled()) {
+                    contentBounds = detectContentBounds(tempCanvas);
+                    if (!contentBounds) {
+                        contentBounds = detectContentBoundsRelaxed(tempCanvas);
+                    }
+                }
+                
+                // 裁剪
+                let finalCanvas = tempCanvas;
+                if (contentBounds && isAutoCropEnabled()) {
+                    finalCanvas = cropToContent(tempCanvas, contentBounds);
+                    if (finalCanvas.width < 100 || finalCanvas.height < 100) {
+                        finalCanvas = tempCanvas;
+                    }
+                }
+                
+                // 自动添加红色边框功能已关闭
+                // if (isDigitalSigned) {
+                //     if (debugMode) {
+                //         console.log(`PDF ${targetIndex + 1} 为数字签名PDF，检查是否需要添加红色边框`);
+                //     }
+                //     
+                //     const hasRedBorder = await checkForRedBorder(finalCanvas);
+                //     
+                //     if (!hasRedBorder) {
+                //         if (debugMode) {
+                //             console.log(`PDF ${targetIndex + 1} 未检测到红色边框，自动添加`);
+                //         }
+                //         finalCanvas = addRedBorder(finalCanvas);
+                //         
+                //         if (targetIndex === 0) { // 只在第一个PDF时提示一次
+                //             showStatus('检测到数字签名PDF且无红色边框，已自动添加红色边框', 'success');
+                //         }
+                //     } else {
+                //         if (debugMode) {
+                //             console.log(`PDF ${targetIndex + 1} 已有红色边框，无需添加`);
+                //         }
+                //     }
+                // }
+                
+                // 转换为图片
+                const result = await new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        uploadedImages[targetIndex] = img;
+                        uploadedPdfs[targetIndex] = {
+                            preview: finalCanvas.toDataURL('image/png', 1.0),
+                            width: finalCanvas.width,
+                            height: finalCanvas.height,
+                            pageNumber: 1,
+                            fileName: file.name,
+                            originalSize: `${viewport.width} × ${viewport.height}`,
+                            croppedSize: contentBounds ? `${finalCanvas.width} × ${finalCanvas.height}` : '未裁剪'
+                        };
+                        resolve(img);
+                    };
+                    img.src = finalCanvas.toDataURL('image/png', 1.0);
+                });
+                
+                // 缓存结果
+                pdfCache.set(cacheKey, result);
+                
+                performanceMonitor.end(`PDF处理 ${targetIndex + 1}`);
+                return result;
+                
+            } catch (error) {
+                performanceMonitor.end(`PDF处理 ${targetIndex + 1} (失败)`);
+                throw error;
+            }
+        }
+
+        // 绘制当前页内容
+        function drawCurrentPage() {
+            initCanvas();
+            
+            // 启用最高质量图像渲染
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.textRenderingOptimization = 'optimizeQuality';
+            
+            // 计算当前页的图片范围
+            const startIndex = currentPage * MAX_IMAGES_PER_PAGE;
+            const endIndex = Math.min(startIndex + MAX_IMAGES_PER_PAGE, uploadedImages.length);
+
+            for (let i = startIndex; i < endIndex; i++) {
+                const img = uploadedImages[i];
+                if (!img) continue;
+
+                const pagePosition = i % MAX_IMAGES_PER_PAGE;
+                
+                // 计算实际可用高度（考虑间隔）
+                const availableHeight = SECTION_HEIGHT - INVOICE_SPACING;
+                const y = pagePosition * SECTION_HEIGHT + INVOICE_SPACING / 2;
+                
+                // 计算图片尺寸，保持宽高比
+                const imgAspectRatio = img.naturalWidth / img.naturalHeight;
+                const sectionAspectRatio = A4_WIDTH / availableHeight;
+                
+                let drawWidth, drawHeight, drawX, drawY;
+                
+                if (imgAspectRatio > sectionAspectRatio) {
+                    // 图片更宽，以宽度为准
+                    drawWidth = A4_WIDTH;
+                    drawHeight = A4_WIDTH / imgAspectRatio;
+                    drawX = 0;
+                    drawY = y + (availableHeight - drawHeight) / 2;
+                } else {
+                    // 图片更高，以高度为准
+                    drawHeight = availableHeight;
+                    drawWidth = availableHeight * imgAspectRatio;
+                    drawX = (A4_WIDTH - drawWidth) / 2;
+                    drawY = y;
+                }
+                
+                // 绘制图片（使用高质量渲染）
+                ctx.save();
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+                ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+                ctx.restore();
+                
+                // 绘制边框
+                ctx.strokeStyle = '#999';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(drawX, drawY, drawWidth, drawHeight);
+
+                // 添加页码标记（右下角）
+                if (pagePosition === MAX_IMAGES_PER_PAGE - 1 || i === uploadedImages.length - 1) {
+                    ctx.save();
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+                    ctx.font = 'bold 48px Arial'; // 放大字体以匹配300 DPI
+                    ctx.textAlign = 'right';
+                    ctx.textBaseline = 'bottom';
+                    ctx.fillText(`第 ${currentPage + 1} 页`, A4_WIDTH - 40, A4_HEIGHT - 40);
+                    ctx.restore();
+                }
+            }
+        }
+
+
+
+        // 导出PDF（支持多页）
+        function exportPDF() {
+            try {
+                if (totalPages === 1) {
+                    // 单页PDF导出
+                    exportSinglePDF();
+                } else {
+                    // 多页PDF导出
+                    exportMultiplePDFs();
+                }
+            } catch (error) {
+                showStatus('PDF导出失败，请重试', 'error');
+                console.error('PDF Export error:', error);
+            }
+        }
+
+        // 导出单页PDF
+        function exportSinglePDF() {
+            try {
+                const quality = getPdfExportQuality();
+                const { jsPDF } = window.jspdf;
+                
+                // 创建A4尺寸的PDF
+                const pdf = new jsPDF({
+                    orientation: 'portrait',
+                    unit: 'mm',
+                    format: 'a4'
+                });
+
+                // 获取当前页的高质量图像数据
+                const imageData = canvas.toDataURL('image/jpeg', quality);
+                
+                // 计算图像在PDF中的尺寸（A4: 210mm x 297mm）
+                const pdfWidth = 210;
+                const pdfHeight = 297;
+                
+                // 添加图像到PDF
+                pdf.addImage(imageData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+                
+                // 下载PDF
+                const fileName = `导出页面_${currentPage + 1}_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.pdf`;
+                pdf.save(fileName);
+                
+                showStatus('PDF导出成功！', 'success');
+            } catch (error) {
+                showStatus('PDF导出失败，请重试', 'error');
+                console.error('Single PDF export error:', error);
+            }
+        }
+
+        // 导出多页PDF
+        function exportMultiplePDFs() {
+            try {
+                const quality = getPdfExportQuality();
+                const { jsPDF } = window.jspdf;
+                
+                // 创建A4尺寸的PDF
+                const pdf = new jsPDF({
+                    orientation: 'portrait',
+                    unit: 'mm',
+                    format: 'a4'
+                });
+
+                const pdfWidth = 210;
+                const pdfHeight = 297;
+                
+                // 保存当前页
+                const originalPage = currentPage;
+                
+                // 为每页创建图像并添加到PDF
+                for (let page = 0; page < totalPages; page++) {
+                    currentPage = page;
+                    drawCurrentPage();
+                    
+                    // 获取当前页的图像数据
+                    const imageData = canvas.toDataURL('image/jpeg', quality);
+                    
+                    // 如果不是第一页，添加新页
+                    if (page > 0) {
+                        pdf.addPage();
+                    }
+                    
+                    // 添加图像到PDF
+                    pdf.addImage(imageData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+                }
+                
+                // 恢复当前页
+                currentPage = originalPage;
+                drawCurrentPage();
+                updatePaginationButtons();
+                updatePageInfo();
+                
+                // 下载PDF
+                const fileName = `导出全部页面_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.pdf`;
+                pdf.save(fileName);
+                
+                showStatus(`成功导出 ${totalPages} 页PDF！`, 'success');
+            } catch (error) {
+                showStatus('多页PDF导出失败，请重试', 'error');
+                console.error('Multiple PDF export error:', error);
+            }
+        }
+
+        // 导出图片（支持多页）
+        function exportImage() {
+            try {
+                if (totalPages === 1) {
+                    // 单页导出
+                    exportSinglePage();
+                } else {
+                    // 多页导出为ZIP
+                    exportMultiplePages();
+                }
+            } catch (error) {
+                showStatus('导出失败，请重试', 'error');
+                console.error('Export error:', error);
+            }
+        }
+
+        // 导出单页
+        function exportSinglePage() {
+                const exportScale = 1; // 直接使用300 DPI，无需额外缩放
+                const exportCanvas = document.createElement('canvas');
+                const exportCtx = exportCanvas.getContext('2d');
+                
+                exportCanvas.width = A4_WIDTH;
+                exportCanvas.height = A4_HEIGHT;
+                
+                // 启用最高质量渲染
+                exportCtx.imageSmoothingEnabled = true;
+                exportCtx.imageSmoothingQuality = 'high';
+                exportCtx.textRenderingOptimization = 'optimizeQuality';
+                
+                // 绘制白色背景
+                exportCtx.fillStyle = 'white';
+                exportCtx.fillRect(0, 0, A4_WIDTH, A4_HEIGHT);
+                
+                // 绘制发票间隔和黑线
+                for (let i = 1; i < 3; i++) {
+                    const y = i * SECTION_HEIGHT;
+                    
+                    // 绘制间隔区域（白色背景）
+                    exportCtx.fillStyle = 'white';
+                    exportCtx.fillRect(0, y - INVOICE_SPACING/2, A4_WIDTH, INVOICE_SPACING);
+                    
+                    // 绘制黑线
+                    exportCtx.strokeStyle = 'black';
+                    exportCtx.lineWidth = INVOICE_LINE_HEIGHT;
+                    exportCtx.setLineDash([]); // 实线
+                    exportCtx.beginPath();
+                    exportCtx.moveTo(0, y);
+                    exportCtx.lineTo(A4_WIDTH, y);
+                    exportCtx.stroke();
+                }
+                
+            // 重新绘制当前页所有图片到高分辨率canvas
+            const startIndex = currentPage * MAX_IMAGES_PER_PAGE;
+            const endIndex = Math.min(startIndex + MAX_IMAGES_PER_PAGE, uploadedImages.length);
+
+            for (let i = startIndex; i < endIndex; i++) {
+                const img = uploadedImages[i];
+                if (!img) continue;
+
+                const pagePosition = i % MAX_IMAGES_PER_PAGE;
+                
+                // 计算实际可用高度（考虑间隔）
+                const availableHeight = SECTION_HEIGHT - INVOICE_SPACING;
+                const y = pagePosition * SECTION_HEIGHT + INVOICE_SPACING / 2;
+                    
+                    // 计算图片尺寸，保持宽高比
+                    const imgAspectRatio = img.naturalWidth / img.naturalHeight;
+                    const sectionAspectRatio = A4_WIDTH / availableHeight;
+                    
+                    let drawWidth, drawHeight, drawX, drawY;
+                    
+                    if (imgAspectRatio > sectionAspectRatio) {
+                        drawWidth = A4_WIDTH;
+                        drawHeight = A4_WIDTH / imgAspectRatio;
+                        drawX = 0;
+                        drawY = y + (availableHeight - drawHeight) / 2;
+                    } else {
+                        drawHeight = availableHeight;
+                        drawWidth = availableHeight * imgAspectRatio;
+                        drawX = (A4_WIDTH - drawWidth) / 2;
+                        drawY = y;
+                    }
+                    
+                    // 绘制图片（最高质量）
+                    exportCtx.save();
+                    exportCtx.imageSmoothingEnabled = true;
+                    exportCtx.imageSmoothingQuality = 'high';
+                    exportCtx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+                    exportCtx.restore();
+                    
+                    // 绘制边框
+                    exportCtx.strokeStyle = '#999';
+                    exportCtx.lineWidth = 2;
+                    exportCtx.strokeRect(drawX, drawY, drawWidth, drawHeight);
+            }
+                
+                const link = document.createElement('a');
+            link.download = `导出页面_${currentPage + 1}_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.png`;
+            link.href = exportCanvas.toDataURL('image/png', 1.0); // 最高质量PNG
+                link.click();
+            showStatus('单页导出成功！', 'success');
+        }
+
+        // 导出多页（提示用户）
+        function exportMultiplePages() {
+            if (confirm(`检测到 ${totalPages} 页内容。是否要逐页导出所有页面？\n\n点击"确定"开始逐页导出，点击"取消"只导出当前页。`)) {
+                // 逐页导出所有页面
+                for (let page = 0; page < totalPages; page++) {
+                    setTimeout(() => {
+                        currentPage = page;
+                        drawCurrentPage();
+
+                        // 为每页创建单独的导出
+                        const exportScale = 1; // 直接使用300 DPI
+                        const exportCanvas = document.createElement('canvas');
+                        const exportCtx = exportCanvas.getContext('2d');
+
+                        exportCanvas.width = A4_WIDTH;
+                        exportCanvas.height = A4_HEIGHT;
+
+                        exportCtx.imageSmoothingEnabled = true;
+                        exportCtx.imageSmoothingQuality = 'high';
+                        exportCtx.textRenderingOptimization = 'optimizeQuality';
+                        exportCtx.fillStyle = 'white';
+                        exportCtx.fillRect(0, 0, A4_WIDTH, A4_HEIGHT);
+
+                        // 绘制发票间隔和黑线
+                        for (let i = 1; i < 3; i++) {
+                            const y = i * SECTION_HEIGHT;
+                            
+                            // 绘制间隔区域（白色背景）
+                            exportCtx.fillStyle = 'white';
+                            exportCtx.fillRect(0, y - INVOICE_SPACING/2, A4_WIDTH, INVOICE_SPACING);
+                            
+                            // 绘制黑线
+                            exportCtx.strokeStyle = 'black';
+                            exportCtx.lineWidth = INVOICE_LINE_HEIGHT;
+                            exportCtx.setLineDash([]); // 实线
+                            exportCtx.beginPath();
+                            exportCtx.moveTo(0, y);
+                            exportCtx.lineTo(A4_WIDTH, y);
+                            exportCtx.stroke();
+                        }
+                        
+                        // 绘制当前页内容
+                        const startIndex = page * MAX_IMAGES_PER_PAGE;
+                        const endIndex = Math.min(startIndex + MAX_IMAGES_PER_PAGE, uploadedImages.length);
+
+                        for (let i = startIndex; i < endIndex; i++) {
+                            const img = uploadedImages[i];
+                            if (!img) continue;
+
+                            const pagePosition = i % MAX_IMAGES_PER_PAGE;
+                            
+                            // 计算实际可用高度（考虑间隔）
+                            const availableHeight = SECTION_HEIGHT - INVOICE_SPACING;
+                            const y = pagePosition * SECTION_HEIGHT + INVOICE_SPACING / 2;
+
+                            const imgAspectRatio = img.naturalWidth / img.naturalHeight;
+                            const sectionAspectRatio = A4_WIDTH / availableHeight;
+
+                            let drawWidth, drawHeight, drawX, drawY;
+
+                            if (imgAspectRatio > sectionAspectRatio) {
+                                drawWidth = A4_WIDTH;
+                                drawHeight = A4_WIDTH / imgAspectRatio;
+                                drawX = 0;
+                                drawY = y + (availableHeight - drawHeight) / 2;
+                            } else {
+                                drawHeight = availableHeight;
+                                drawWidth = availableHeight * imgAspectRatio;
+                                drawX = (A4_WIDTH - drawWidth) / 2;
+                                drawY = y;
+                            }
+
+                            // 绘制图片（最高质量）
+                            exportCtx.save();
+                            exportCtx.imageSmoothingEnabled = true;
+                            exportCtx.imageSmoothingQuality = 'high';
+                            exportCtx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+                            exportCtx.restore();
+                            
+                            exportCtx.strokeStyle = '#999';
+                            exportCtx.lineWidth = 2;
+                            exportCtx.strokeRect(drawX, drawY, drawWidth, drawHeight);
+                        }
+
+                        const link = document.createElement('a');
+                        link.download = `导出页面_${page + 1}_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.png`;
+                        link.href = exportCanvas.toDataURL('image/png', 1.0); // 最高质量PNG
+                        link.click();
+
+                        if (page === totalPages - 1) {
+                            showStatus(`所有 ${totalPages} 页已导出完成！`, 'success');
+                            // 恢复当前显示页
+                            currentPage = 0;
+                            drawCurrentPage();
+                            updatePaginationButtons();
+                            updatePageInfo();
+                        }
+                    }, page * 500); // 延迟导出，避免浏览器阻塞
+                }
+            } else {
+                // 只导出当前页
+                exportSinglePage();
+            }
+        }
+
+        // 打印图片（支持多页）
+        function printImage() {
+            try {
+                if (totalPages === 1) {
+                    // 单页直接打印
+                window.print();
+                showStatus('正在打开打印对话框...', 'success');
+                } else {
+                    // 多页打印预览
+                    previewPrint();
+                }
+            } catch (error) {
+                showStatus('打印失败，请重试', 'error');
+                console.error('Print error:', error);
+            }
+        }
+
+        // 打印预览（支持多页）
+        function previewPrint() {
+            try {
+                const w = window.open('', '_blank', 'width=900,height=700');
+
+                // 创建多页预览内容
+                let previewContent = '';
+                let actualPages = 0; // 记录实际有内容的页数
+
+                // 保存当前页
+                const originalPage = currentPage;
+
+                // 为每页创建预览
+                for (let page = 0; page < totalPages; page++) {
+                    currentPage = page;
+
+                    // 检查当前页是否有图片
+                    const startIndex = currentPage * MAX_IMAGES_PER_PAGE;
+                    const endIndex = Math.min(startIndex + MAX_IMAGES_PER_PAGE, uploadedImages.length);
+
+                    // 确保当前页有图片内容才生成预览
+                    if (startIndex < uploadedImages.length && endIndex > startIndex) {
+                        drawCurrentPage();
+                        const pageImage = canvas.toDataURL('image/png', 1.0);
+                        actualPages++;
+
+                        previewContent += `
+                            <div class="preview-page" style="margin-bottom: 30px; text-align: center;">
+                                <div style="font-weight: bold; margin-bottom: 10px; color: #333;">第 ${actualPages} 页</div>
+                                <img src="${pageImage}" class="preview-image" alt="第 ${actualPages} 页" style="max-width: 100%; height: auto; border: 1px solid #ddd; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                            </div>
+                        `;
+                    }
+                }
+
+                // 恢复当前页
+                currentPage = originalPage;
+                drawCurrentPage();
+
+                const s = `
+                    /* --- STYLES FOR PREVIEW WINDOW --- */
+                    body {
+                        margin: 0;
+                        padding: 20px;
+                        background-color: #f0f0f0;
+                        font-family: sans-serif;
+                    }
+                    .preview-container, .preview-header, .preview-controls {
+                        background-color: white;
+                        text-align: center;
+                        margin: 0 auto 20px auto;
+                        padding: 15px;
+                        border-radius: 8px;
+                        max-width: 800px;
+                        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+                    }
+                    .preview-page {
+                        margin-bottom: 20px;
+                        page-break-after: always; /* 每页后分页 */
+                    }
+                    .preview-page:last-child {
+                        margin-bottom: 0;
+                        page-break-after: avoid; /* 最后一页不分页 */
+                    }
+                    .preview-image {
+                        max-width: 100%;
+                        border: 1px solid #ccc;
+                    }
+                    .preview-btn {
+                        padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 5px;
+                        page-break-inside: avoid;
+                    }
+                    .print-btn { background-color: #28a745; color: white; }
+                    .close-btn { background-color: #6c757d; color: white; }
+
+                    /* --- STYLES FOR PRINTING --- */
+                    @media print {
+                        @page { 
+                            size: A4; 
+                            margin: 0; 
+                          
+                        }
+                        body {
+                            padding: 0;
+                            margin: 0;
+                            background-color: white;
+                        }
+                        /* Hide all UI elements except the images container */
+                        .preview-header, .preview-controls {
+                            display: none;
+                        }
+                        .preview-container {
+                            margin: 0;
+                            padding: 0;
+                            box-shadow: none;
+                            border-radius: 0;
+                        }
+                        .preview-page {
+                            margin: 0;
+                            padding: 0;
+                            width: 100%;
+                            height: 100%;
+                        }
+                        .preview-image {
+                            width: 100%;
+                            height: 100%;
+                            border: none;
+                            box-shadow: none;
+                            object-fit: contain; /* Ensure image fits without distortion */
+                        }
+                    }
+                `;
+
+                const b = `
+                    <div class="preview-header">
+                        <h2>打印预览 - 共 ${actualPages} 页</h2>
+                        <p>请检查以下页面。点击“打印所有页”将调用系统打印功能。</p>
+                    </div>
+                    <div class="preview-container">
+                        ${previewContent}
+                    </div>
+                    <div class="preview-controls">
+                        <button class="preview-btn print-btn" onclick="printAllPages()">🖨️ 打印所有页</button>
+                        <button class="preview-btn close-btn" onclick="window.close()">关闭</button>
+                    </div>
+                `;
+
+                const script = 'function printAllPages() {' +
+                    'const images = document.querySelectorAll(".preview-image");' +
+                    'if (images.length === 0) return;' +
+                    'let printHtml = "";' +
+                    'images.forEach((img, index) => {' +
+                    'const isLast = index === images.length - 1;' +
+                    'const pageBreak = isLast ? "" : "page-break-after: always;";' +
+                    'printHtml += `<div style="width: 100%; height: 100vh; ${pageBreak}"><img src="${img.src}" style="width: 100%; height: 100vh; object-fit: contain;" /></div>`;' +
+                    '});' +
+                    'const printFrame = document.createElement("iframe");' +
+                    'printFrame.style.position = "absolute";' +
+                    'printFrame.style.width = "0";' +
+                    'printFrame.style.height = "0";' +
+                    'printFrame.style.border = "0";' +
+                    'document.body.appendChild(printFrame);' +
+                    'const frameDoc = printFrame.contentWindow.document;' +
+                    'frameDoc.open();' +
+                    'frameDoc.write(`<!DOCTYPE html><html><head><title>打印</title><style>' +
+                    '@page { size: A4; margin: 0; }' +
+                    'body, html { margin: 0; padding: 0; width: 100%; height: 100%; }' +
+                    'img { display: block; }' +
+                    '</style></head><body>${printHtml}</body></html>`);' +
+                    'frameDoc.close();' +
+                    'setTimeout(() => {' +
+                    'try {' +
+                    'printFrame.contentWindow.focus();' +
+                    'printFrame.contentWindow.print();' +
+                    '} finally {' +
+                    'document.body.removeChild(printFrame);' +
+                    '}' +
+                    '}, 500);' +
+                    '}';
+
+
+                const h =
+                    '<!DOCTYPE html>' +
+                    '<html>' +
+                    '<head>' +
+                    '<title>打印预览</title>' +
+                    '<style>' + s + '</style>' +
+                    '</head>' +
+                    '<body>' +
+                    b +
+                    '<script>' + script + '<\/script>' +
+                    '</body>' +
+                    '</html>';
+
+
+                w.document.write(h);
+                w.document.close();
+                showStatus('已打开多页打印预览窗口', 'success');
+
+
+
+
+            } catch (error) {
+                showStatus('预览失败，请重试', 'error');
+                console.error('Preview error:', error);
+            }
+        }
+
+        // 分页控制函数
+        function prevPage() {
+            if (currentPage > 0) {
+                currentPage--;
+                drawCurrentPage();
+                updatePaginationButtons();
+                updatePageInfo();
+            }
+        }
+
+        function nextPage() {
+            if (currentPage < totalPages - 1) {
+                currentPage++;
+                drawCurrentPage();
+                updatePaginationButtons();
+                updatePageInfo();
+            }
+        }
+
+        function updatePaginationButtons() {
+            document.getElementById('prevPageBtn').disabled = currentPage === 0;
+            document.getElementById('nextPageBtn').disabled = currentPage === totalPages - 1;
+        }
+
+        function updatePageInfo() {
+            document.getElementById('pageInfo').textContent = `第 ${currentPage + 1} 页 / 共 ${totalPages} 页`;
+        }
+
+        // 清空画布
+        function clearCanvas() {
+            uploadedImages = [];
+            uploadedPdfs = [];
+            currentPdfFiles = [];
+            currentPage = 0;
+            totalPages = 1;
+            initCanvas();
+            updateImageInfo();
+            exportBtn.disabled = true;
+            exportPdfBtn.disabled = true;
+
+            previewBtn.disabled = true;
+            mainFileInput.value = '';
+            imageInput.value = '';
+            pdfInput.value = '';
+            document.getElementById('reprocessBtn').style.display = 'none';
+            document.getElementById('paginationControls').style.display = 'none';
+            updatePaginationButtons();
+            updatePageInfo();
+            showStatus('画布已清空', 'info');
+        }
+
+
+
+        // 处理图片文件
+        async function processImageFiles(files) {
+            const remainingSlots = MAX_IMAGES_PER_PAGE * MAX_PAGES - uploadedImages.length;
+            if (remainingSlots <= 0) {
+                showStatus(`已达到最多${MAX_IMAGES_PER_PAGE * MAX_PAGES}个文件的限制。如需继续，请先清空画布。`, 'error');
+                return;
+            }
+
+            if (files.length > remainingSlots) {
+                showStatus(`本次最多还能添加 ${remainingSlots} 个文件（总计不超过${MAX_IMAGES_PER_PAGE * MAX_PAGES}个）`, 'info');
+            }
+
+            const filesToLoad = files.slice(0, Math.max(0, remainingSlots));
+            const startIndex = uploadedImages.length; // 记录新增文件的起始下标
+            let loadedCount = 0;
+
+            filesToLoad.forEach((file) => {
+                const reader = new FileReader();
+                reader.onload = function (event) {
+                    const img = new Image();
+                    img.onload = function () {
+                        uploadedImages.push(img);
+                        loadedCount++;
+
+                        if (loadedCount === filesToLoad.length) {
+                            // 更新总页数
+                            totalPages = Math.ceil(uploadedImages.length / MAX_IMAGES_PER_PAGE);
+
+                            // 显示或隐藏分页控件
+                            const paginationControls = document.getElementById('paginationControls');
+                            if (totalPages > 1) {
+                                paginationControls.style.display = 'block';
+                                updatePaginationButtons();
+                                updatePageInfo();
+                            }
+
+                            // 绘制当前页内容
+                            drawCurrentPage();
+                            updateImageInfo();
+                            exportBtn.disabled = uploadedImages.length === 0;
+                            exportPdfBtn.disabled = uploadedImages.length === 0;
+
+                            previewBtn.disabled = uploadedImages.length === 0;
+                            showStatus(`成功添加 ${filesToLoad.length} 个文件（当前共 ${uploadedImages.length} 个，${totalPages} 页）`, 'success');
+                        }
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // 初始化
+        initCanvas();
+        updateQualityInfo();
+        updatePdfExportQualityInfo();
+        updatePaginationButtons();
+        updatePageInfo();
+        
+        // 显示画布像素信息
+        const devicePixelRatio = window.devicePixelRatio || 1;
+        console.log('设备像素比:', devicePixelRatio);
+        console.log('画布实际尺寸:', canvas.width, 'x', canvas.height);
+        console.log('画布显示尺寸:', canvas.style.width, 'x', canvas.style.height);
+        
+        showStatus('请选择要上传的文件（图片或PDF，最多30个）');
+    </script>
+</body>
+
+</html>
