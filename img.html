@@ -3,477 +3,1106 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>发票图片导出器</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>小戴发票导出器 - 专业文档处理工具</title>
+    <script src="https://mp-ed01968e-26df-4373-b4c3-36b55c3faf13.cdn.bspapp.com/tailwindcss.js"></script>
+  
+    <script src="https://mp-ed01968e-26df-4373-b4c3-36b55c3faf13.cdn.bspapp.com/jspdf.umd.min.js"></script>
+    <script src="https://mp-ed01968e-26df-4373-b4c3-36b55c3faf13.cdn.bspapp.com/pdf.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'Noto Sans', 'sans-serif', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji'],
+                    },
+                    colors: {
+                        primary: {
+                            50: '#fef2f2',
+                            100: '#fee2e2',
+                            200: '#fecaca',
+                            300: '#fca5a5',
+                            400: '#f87171',
+                            500: '#ef4444',
+                            600: '#dc2626',
+                            700: '#b91c1c',
+                            800: '#991b1b',
+                            900: '#7f1d1d',
+                        }
+                    },
+                    boxShadow: {
+                        'glow': '0 0 40px -10px rgba(220, 38, 38, 0.3)',
+                        'card': '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                        'float': '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                        'mobile': '0 -4px 20px rgba(0, 0, 0, 0.1)',
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
         body {
-            font-family: 'Microsoft YaHei', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #fef2f2 0%, #fff1f2 50%, #fef2f2 100%);
             min-height: 100vh;
-            padding: 20px;
+            -webkit-tap-highlight-color: transparent;
         }
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
+        .gradient-text {
+            background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
 
-        .header {
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-            color: white;
-            padding: 30px;
-            text-align: center;
+        /* 毛玻璃效果 */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(254, 202, 202, 0.2);
         }
 
-        .header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        .glass-panel-mobile {
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(10px);
         }
 
-        .header p {
-            font-size: 1.1em;
-            opacity: 0.9;
+        /* 浮动装饰 */
+        .floating-shape {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.3;
+            animation: float 20s infinite ease-in-out;
+            z-index: 0;
+            pointer-events: none;
         }
 
-        .controls {
-            padding: 30px;
-            background: #f8f9fa;
-            border-bottom: 1px solid #e9ecef;
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translate(0, 0) scale(1);
+            }
+
+            25% {
+                transform: translate(30px, -50px) scale(1.05);
+            }
+
+            50% {
+                transform: translate(-20px, 30px) scale(0.95);
+            }
+
+            75% {
+                transform: translate(-30px, -20px) scale(1.02);
+            }
         }
 
-        .button-group {
-            display: flex;
-            gap: 15px;
-            justify-content: center;
-            flex-wrap: wrap;
+        /* 动画 */
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
-        .btn {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
+        .animate-slide-up {
+            animation: slideUp 0.6s ease-out forwards;
         }
 
+        /* 按钮样式 */
         .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
             color: white;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 20px 25px -5px rgba(220, 38, 38, 0.4);
         }
 
-        .btn-success {
-            background: linear-gradient(135deg, #56ab2f 0%, #a8e6cf 100%);
-            color: white;
-        }
-
-        .btn-success:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(86, 171, 47, 0.4);
-        }
-
-        .btn-warning {
-            background: linear-gradient(135deg, #ff9a56 0%, #ff6b6b 100%);
-            color: white;
-        }
-
-        .btn-warning:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(255, 154, 86, 0.4);
-        }
-
-        .btn-info {
-            background: linear-gradient(135deg, #17a2b8 0%, #6f42c1 100%);
-            color: white;
-        }
-
-        .btn-info:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 20px rgba(23, 162, 184, 0.4);
-        }
-
-        .btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .canvas-container {
-            padding: 30px;
-            display: flex;
-            justify-content: center;
-            background: #f8f9fa;
-        }
-
-        #canvas {
-            border: 2px solid #ddd;
-            border-radius: 8px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        .btn-secondary {
             background: white;
-            image-rendering: -webkit-optimize-contrast;
-            image-rendering: crisp-edges;
-            image-rendering: high-quality;
-            max-width: 100%;
-            height: auto;
+            color: #374151;
+            border: 1px solid #fecaca;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        .status {
-            padding: 20px 30px;
-            text-align: center;
-            font-size: 16px;
-            color: #666;
+        .btn-secondary:hover {
+            background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+            border-color: #f87171;
+            transform: translateY(-1px);
         }
 
-        .status.success {
-            color: #28a745;
-            background: #d4edda;
-            border-radius: 8px;
-            margin: 0 30px 30px 30px;
+        .tool-btn {
+            background: white;
+            border: 1px solid #fecaca;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        .status.error {
-            color: #dc3545;
-            background: #f8d7da;
-            border-radius: 8px;
-            margin: 0 30px 30px 30px;
+        .tool-btn:hover {
+            background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+            border-color: #f87171;
+            transform: translateY(-1px);
         }
 
-        .image-info {
-            display: flex;
-            gap: 20px;
-            justify-content: center;
-            margin-top: 20px;
-            flex-wrap: wrap;
+        /* 按钮状态样式 */
+        .btn-disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background: #f5f5f5 !important;
+            color: #999 !important;
+            border-color: #e0e0e0 !important;
+        }
+
+        .btn-disabled:hover {
+            background: #f5f5f5 !important;
+            border-color: #e0e0e0 !important;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-disabled:hover::before {
             display: none;
         }
 
-        .image-item {
-            background: white;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-            text-align: center;
-            min-width: 150px;
-        }
-
-        .image-item img {
-            max-width: 100px;
-            max-height: 60px;
-            object-fit: contain;
-            border-radius: 4px;
-            margin-bottom: 10px;
-        }
-
-        .image-item p {
-            font-size: 12px;
-            color: #666;
-            margin: 5px 0;
-        }
-
-        .quality-selector {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            justify-content: center;
-            margin-top: 15px;
-            padding: 15px;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        }
-
-        .quality-selector label {
-            font-weight: 600;
-            color: #333;
-        }
-
-        .quality-selector select {
-            padding: 8px 12px;
-            border: 2px solid #ddd;
-            border-radius: 6px;
-            font-size: 14px;
-            background: white;
+        .btn-active {
+            opacity: 1;
             cursor: pointer;
-            transition: border-color 0.3s ease;
+            background: linear-gradient(135deg, #f87171 0%, #ef4444 100%) !important;
+            color: white !important;
+            border-color: #f87171 !important;
+            box-shadow: 0 4px 15px rgba(248, 113, 113, 0.25) !important;
         }
 
-        .quality-selector select:focus {
-            outline: none;
-            border-color: #667eea;
+        .btn-active:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 20px 25px -5px rgba(248, 113, 113, 0.35) !important;
         }
 
-        .quality-selector input[type="checkbox"] {
-            width: 18px;
-            height: 18px;
-            cursor: pointer;
-            accent-color: #667eea;
+        /* 不同按钮的颜色主题 */
+        .btn-active.export-image {
+            background: linear-gradient(135deg, #86efac 0%, #4ade80 100%) !important;
+            border-color: #86efac !important;
+            box-shadow: 0 4px 15px rgba(134, 239, 172, 0.25) !important;
         }
 
-        .quality-info {
-            font-size: 12px;
-            color: #666;
-            margin-top: 5px;
+        .btn-active.export-image:hover {
+            box-shadow: 0 20px 25px -5px rgba(134, 239, 172, 0.35) !important;
         }
 
+        .btn-active.export-pdf {
+            background: linear-gradient(135deg, #93c5fd 0%, #60a5fa 100%) !important;
+            border-color: #93c5fd !important;
+            box-shadow: 0 4px 15px rgba(147, 197, 253, 0.25) !important;
+        }
+
+        .btn-active.export-pdf:hover {
+            box-shadow: 0 20px 25px -5px rgba(147, 197, 253, 0.35) !important;
+        }
+
+        .btn-active.print-preview {
+            background: linear-gradient(135deg, #c4b5fd 0%, #a78bfa 100%) !important;
+            border-color: #c4b5fd !important;
+            box-shadow: 0 4px 15px rgba(196, 181, 253, 0.25) !important;
+        }
+
+        .btn-active.print-preview:hover {
+            box-shadow: 0 20px 25px -5px rgba(196, 181, 253, 0.35) !important;
+        }
+
+        .btn-active.add-image {
+            background: linear-gradient(135deg, #fdba74 0%, #fb923c 100%) !important;
+            border-color: #fdba74 !important;
+            box-shadow: 0 4px 15px rgba(253, 186, 116, 0.25) !important;
+        }
+
+        .btn-active.add-image:hover {
+            box-shadow: 0 20px 25px -5px rgba(253, 186, 116, 0.35) !important;
+        }
+
+        .btn-active.add-pdf {
+            background: linear-gradient(135deg, #fca5a5 0%, #f87171 100%) !important;
+            border-color: #fca5a5 !important;
+            box-shadow: 0 4px 15px rgba(252, 165, 165, 0.25) !important;
+        }
+
+        .btn-active.add-pdf:hover {
+            box-shadow: 0 20px 25px -5px rgba(252, 165, 165, 0.35) !important;
+        }
+
+        .btn-active.clear-canvas {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%) !important;
+            border-color: #fbbf24 !important;
+            box-shadow: 0 4px 15px rgba(251, 191, 36, 0.25) !important;
+        }
+
+        
+        /* 红色圈悬停效果 */
+        .btn-disabled:hover {
+            position: relative;
+        }
+
+        .btn-disabled:hover::after {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            border: 2px solid #dc2626;
+            border-radius: inherit;
+            pointer-events: none;
+            animation: pulseRed 1.5s infinite;
+        }
+
+        @keyframes pulseRed {
+            0% {
+                box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4);
+            }
+            70% {
+                box-shadow: 0 0 0 4px rgba(220, 38, 38, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(220, 38, 38, 0);
+            }
+        }
+
+        /* 荣耀浏览器修复 */
+        @media screen and (-webkit-min-device-pixel-ratio: 0) {
+            nav, .pagination-controls, .pagination-controls-mobile, #canvas {
+                position: relative !important;
+                -webkit-transform: translateZ(0);
+                transform: translateZ(0);
+            }
+        }
+
+        /* 移动端通用修复 */
         @media (max-width: 768px) {
-            .button-group {
-                flex-direction: column;
-                align-items: center;
-            }
-            
-            .btn {
-                width: 100%;
-                max-width: 300px;
+            .fixed, .sticky {
+                -webkit-transform: translateZ(0);
+                transform: translateZ(0);
             }
         }
 
-        /* 打印样式 */
-        @media print {
-            @page {
-                margin: 0 !important;
-                size: A4 !important;
-            }
-            
-            body {
-                background: white !important;
-                padding: 0 !important;
-                margin: 0 !important;
-            }
-            
-            .container {
-                box-shadow: none !important;
-                border-radius: 0 !important;
-                max-width: none !important;
-                margin: 0 !important;
-                padding: 0 !important;
-            }
-            
-            .header,
-            .controls,
-            .status {
-                display: none !important;
-            }
-            
-            .canvas-container {
-                padding: 0 !important;
-                background: white !important;
-                margin: 0 !important;
-            }
-            
-            #canvas {
-                border: none !important;
-                box-shadow: none !important;
-                width: 100% !important;
-                height: auto !important;
-                margin: 0 !important;
-                padding: 0 !important;
-            }
-            
-            /* 确保发票间隔和黑线在打印时正确显示 */
-            .invoice-separator {
-                background: white !important;
-                height: 20px !important;
-                width: 100% !important;
-                border-bottom: 3px solid black !important;
-            }
+        /* 响应式调整 */
+        .mobile-title-hidden {
+            display: block;
         }
-        
-        /* 进度条样式 */
-        .progress-container {
-            background: white;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
         }
-        
-        .progress-bar {
-            width: 100%;
-            height: 8px;
-            background: #e9ecef;
-            border-radius: 4px;
+
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* 画布样式 */
+        .canvas-wrapper {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(254, 202, 202, 0.3);
+            border-radius: 16px;
+            padding: 8px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            position: relative;
             overflow: hidden;
-            margin-bottom: 8px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 400px;
         }
-        
-        .progress-fill {
+
+        .canvas-wrapper::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image:
+                radial-gradient(circle at 1px 1px, rgba(220, 38, 38, 0.03) 1px, transparent 0);
+            background-size: 20px 20px;
+            pointer-events: none;
+        }
+
+        #canvas {
+            display: block;
+            max-width: 100%;
+            height: auto;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        /* 分页控件 */
+        .pagination-controls {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0.6) 100%);
+            border: 2px solid rgba(254, 202, 202, 0.3);
+            backdrop-filter: blur(10px);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .pagination-controls::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg,
+                    transparent,
+                    rgba(220, 38, 38, 0.3),
+                    transparent);
+        }
+
+        /* 固定定位的分页控件 */
+        .pagination-controls.fixed {
+            position: fixed !important;
+            bottom: 30px !important;
+            left: 50% !important;
+            transform: translateX(-50%) !important;
+            z-index: 1000 !important;
+            background: rgba(255, 255, 255, 0.95) !important;
+            backdrop-filter: blur(20px) !important;
+            border: 2px solid rgba(254, 202, 202, 0.3) !important;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+            border-radius: 16px !important;
+            padding: 16px 24px !important;
+        }
+
+        /* 响应式调整 */
+        @media (max-width: 768px) {
+            .pagination-controls.fixed {
+                bottom: 20px !important;
+                padding: 12px 16px !important;
+                gap: 8px !important;
+                max-width: calc(100vw - 40px) !important;
+                font-size: 18px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .pagination-controls.fixed {
+                bottom: 15px !important;
+                padding: 10px 12px !important;
+                gap: 6px !important;
+                max-width: calc(100vw - 20px) !important;
+                font-size: 14px;
+            }
+        }
+
+        .page-btn {
+            background: white;
+            border: 2px solid #fecaca;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .page-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
             height: 100%;
-            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-            border-radius: 4px;
-            transition: width 0.3s ease;
-            width: 0%;
+            background: linear-gradient(90deg,
+                    transparent,
+                    rgba(220, 38, 38, 0.1),
+                    transparent);
+            transition: left 0.5s;
         }
-        
-        .progress-text {
-            font-size: 14px;
-            color: #666;
-            text-align: center;
-            font-weight: 500;
+
+        .page-btn:hover::before {
+            left: 100%;
         }
-    </style>
-</head>
 
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>📄 文件导出器</h1>
-            <p>上传图片或PDF文件，自动排版为A4尺寸并导出</p>
-        </div>
+        .page-btn:hover:not(:disabled) {
+            background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+            border-color: #f87171;
+            color: #dc2626;
+            transform: translateY(-3px);
+            box-shadow: 0 12px 35px rgba(248, 113, 113, 0.2);
+        }
 
-        <div class="controls">
-            <div class="button-group">
-                <input type="file" id="mainFileInput" accept="image/*,.pdf" multiple style="display: none;">
-                <input type="file" id="imageInput" accept="image/*" multiple style="display: none;">
-                <input type="file" id="pdfInput" accept="application/pdf" multiple style="display: none;">
-                <button class="btn btn-primary" onclick="document.getElementById('mainFileInput').click()">
-                    📁 选择初始文件
-                </button>
-                <button class="btn btn-success" onclick="document.getElementById('imageInput').click()">
-                    ➕ 续加图片
-                </button>
-                <button class="btn btn-success" onclick="document.getElementById('pdfInput').click()">
-                    📄 续加PDF
-                </button>
-                <button class="btn btn-primary" id="exportBtn" onclick="exportImage()" disabled>
-                    💾 导出图片
+        .page-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+            filter: grayscale(0.5);
+        }
+
+        .page-info {
+            background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+            border: 2px solid #fecaca;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .page-info::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg,
+                    transparent,
+                    rgba(220, 38, 38, 0.2),
+                    transparent);
+        }
+
+        /* 质量选择器 */
+        .quality-selector {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(254, 202, 202, 0.3);
+        }
+
+        /* 进度条 */
+        .progress-container {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(254, 202, 202, 0.3);
+        }
+
+        .progress-fill {
+            background: linear-gradient(90deg, #dc2626, #ef4444);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-fill::after {
+
+            /* 触摸优化 */
+            .touch-manipulation {
+                touch-action: manipulation;
+            }
+
+            /* 图片信息 */
+            .image-info {
+                display: flex;
+                gap: 16px;
+                justify-content: center;
+                margin-top: 16px;
+                flex-wrap: wrap;
+            }
+
+            .image-item {
+                background: rgba(255, 255, 255, 0.8);
+                padding: 8px 12px;
+                border-radius: 8px;
+                font-size: 12px;
+                color: #6b7280;
+                border: 1px solid #fecaca;
+            }
+        }
+
+            </style>
+
+<body class="font-sans text-gray-800 overflow-x-hidden relative pb-0 md:pb-0 mb-0">
+
+    <!-- 顶部导航 - 响应式 -->
+    <nav
+        class="relative z-50 glass-panel sticky top-0 border-b border-red-100 mobile-header-compact transition-all duration-300 bg-white/90">
+        <div class="max-w-7xl mx-auto px-4 md:px-6 py-3 md:py-4 flex items-center justify-between">
+            <!-- Logo区域 -->
+            <div class="flex items-center gap-2 md:gap-3">
+                <div
+                    class="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center text-white shadow-lg">
+                    <span class="text-sm md:text-lg">📄</span>
+                </div>
+                <div class="mobile-title-hidden">
+                    <h1 class="text-lg md:text-xl font-bold gradient-text tracking-tight">小戴发票导出器</h1>
+                    <p class="text-xs text-gray-500 font-medium"><span class="mr-1">🐴</span>小马过河&nbsp;&&nbsp;<span class="mr-1">🚀</span>&nbsp;助力科技 服务创造</p>
+                </div>
+            </div>
+
+            <!-- 桌面端打印功能菜单 -->
+            <div class="hidden md:flex items-center gap-3">
+                <!-- 导出图片按钮 -->
+                <button class="px-3 py-2 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 transition-all duration-300 flex items-center gap-2 shadow-md hover:shadow-lg" id="exportBtn" onclick="exportImage()" disabled>
+                    <span class="text-sm">🖼️</span>
+                    <span>导出图片</span>
                 </button>
                 
-                <button class="btn btn-success" id="exportPdfBtn" onclick="exportPDF()" disabled>
-                    📋 导出PDF
+                <!-- 导出PDF按钮 -->
+                <button class="px-3 py-2 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 transition-all duration-300 flex items-center gap-2 shadow-md hover:shadow-lg" id="exportPdfBtn" onclick="exportPDF()" disabled>
+                    <span class="text-sm">📑</span>
+                    <span>导出PDF</span>
+                </button>
+                
+                <!-- 打印预览按钮 -->
+                <button class="px-3 py-2 rounded-lg text-sm font-medium text-white bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 transition-all duration-300 flex items-center gap-2 shadow-md hover:shadow-lg" id="printPreviewBtn" onclick="previewPrint()" disabled>
+                    <span class="text-sm">🖨️</span>
+                    <span>打印预览</span>
+                </button>
+                
+                <div class="h-8 w-px bg-red-200"></div>
+                
+                <!-- 系统状态 -->
+                <div class="flex items-center gap-2 text-sm text-gray-600">
+                    <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                    <span>系统就绪</span>
+                </div>
+            </div>
+
+            <!-- 移动端菜单按钮 -->
+            <button
+                class="md:hidden w-auto min-w-[100px] h-12 flex items-center justify-center rounded-xl bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-medium px-4 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                onclick="toggleMobileMenu()">
+                <span class="text-lg mr-2">⬇️</span>
+                <span class="text-sm font-semibold">导出</span>
+            </button>
+        </div>
+
+        <!-- 移动端下拉菜单 -->
+        <div id="mobileMenu"
+            class="hidden md:hidden absolute top-full left-0 right-0 glass-panel-mobile border-b border-red-100 shadow-lg">
+            <div class="px-4 py-3 space-y-2">
+                <!-- 导出功能 -->
+                <button class="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-50 text-gray-700 mobile-export-btn" onclick="exportImage()" disabled>
+                    <span class="text-green-500">🖼️</span>
+                    <span>导出图片</span>
+                </button>
+                
+                <button class="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-50 text-gray-700 mobile-export-pdf-btn" onclick="exportPDF()" disabled>
+                    <span class="text-blue-500">📑</span>
+                    <span>导出PDF</span>
+                </button>
+                
+                <button class="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-50 text-gray-700 mobile-print-preview-btn" onclick="previewPrint()" disabled>
+                    <span class="text-purple-500">🖨️</span>
+                    <span>打印预览</span>
+                </button>
+                
+                <div class="border-t border-red-100 my-2"></div>
+             
+            </div>
+        </div>
+    </nav>
+
+    <main class="relative z-10 max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-8 space-y-4 md:space-y-6 bg-gradient-to-b from-transparent to-white/50">
+
+        <!-- 标题区域 - 响应式 -->
+        <div class="text-center space-y-1 md:space-y-2 animate-slide-up px-2">
+            <h2 class="text-xl md:text-3xl font-bold text-gray-800">上传图片或PDF文件</h2>
+            <p class="text-sm md:text-base text-gray-500">自动排版为A4尺寸并导出，支持批量处理与智能识别</p>
+        </div>
+
+        <!-- 主操作区 - 响应式 -->
+        <div class="glass-panel rounded-xl md:rounded-2xl p-4 md:p-6 shadow-glow animate-slide-up"
+            style="animation-delay: 0.1s;">
+
+            <!-- 主要按钮组 - 移动端横向滚动，桌面端网格 -->
+            <div
+                class="flex md:flex-wrap items-center gap-2 md:gap-4 mb-4 md:mb-8 overflow-x-auto hide-scrollbar pb-2 md:pb-0 md:justify-center">
+                <!-- 主按钮 -->
+                <button
+                    class="btn-primary text-white px-4 md:px-8 py-3 md:py-4 rounded-xl font-semibold flex items-center gap-2 md:gap-3 shadow-lg group flex-shrink-0 touch-manipulation"
+                    onclick="document.getElementById('mainFileInput').click()">
+                    <div
+                        class="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-white/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <span class="text-base md:text-lg">📁</span>
+                    </div>
+                    <div class="text-left">
+                        <div class="text-sm md:text-base opacity-90">选择文件</div>
+                        <div class="hidden md:block text-xs opacity-75">支持图片/PDF</div>
+                    </div>
                 </button>
 
-                <button class="btn btn-info" id="previewBtn" onclick="previewPrint()" disabled>
-                    👁️ 打印预览
+                <div class="hidden md:block h-12 w-px bg-red-200 mx-2"></div>
+
+                <!-- 工具按钮 - 移动端紧凑 -->
+                <button
+                    class="tool-btn btn-secondary px-4 md:px-6 py-3 md:py-4 rounded-xl font-medium flex items-center gap-2 text-gray-700 flex-shrink-0"
+                    onclick="document.getElementById('imageInput').click()">
+                    <span class="text-red-500">➕</span>
+                    <span class="text-sm md:text-base">续加图片</span>
                 </button>
-                <button class="btn btn-warning" onclick="clearCanvas()">
-                    🗑️ 清空画布
+
+                <button
+                    class="tool-btn btn-secondary px-4 md:px-6 py-3 md:py-4 rounded-xl font-medium flex items-center gap-2 text-gray-700 flex-shrink-0"
+                    onclick="document.getElementById('pdfInput').click()">
+                    <span class="text-red-500">📑</span>
+                    <span class="text-sm md:text-base">续加PDF</span>
                 </button>
-                <button class="btn btn-primary" id="reprocessBtn" onclick="reprocessPDF()" style="display: none;">
-                    🔄 重新渲染PDF
+
+                <button
+                    class="tool-btn btn-secondary px-4 md:px-6 py-3 md:py-4 rounded-xl font-medium flex items-center gap-2 text-gray-700 flex-shrink-0"
+                    id="previewBtn" onclick="clearCanvas()" disabled>
+                    <span class="text-orange-500">🗑️</span>
+                    <span class="text-sm md:text-base">清空页面</span>
                 </button>
-                <div class="pagination-controls" style="display: none; margin-top: 15px; text-align: center;"
-                    id="paginationControls">
-                    <button class="btn btn-info" onclick="prevPage()" id="prevPageBtn" disabled>
-                        ◀️ 上一页
-                    </button>
-                    <span style="margin: 0 15px; font-weight: bold;" id="pageInfo">第 1 页 / 共 1 页</span>
-                    <button class="btn btn-info" onclick="nextPage()" id="nextPageBtn" disabled>
-                        下一页 ▶️
-                </button>
+
+            </div>
+
+            <!-- 进度条 -->
+            <div class="progress-container rounded-lg p-4 hidden" id="progressContainer">
+                <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
+                    <div class="progress-fill h-2 rounded-full transition-all duration-300" id="progressFill"
+                        style="width: 0%"></div>
                 </div>
+                <div class="text-sm text-gray-600 text-center" id="progressText">处理中...</div>
             </div>
-            <div class="image-info" id="imageInfo"></div>
-            <div class="quality-selector">
-                <label for="pdfQuality">PDF渲染质量:</label>
-                <select id="pdfQuality">
-                    <option value="2.0">标准 (2x)</option>
-                    <option value="3.0">高清 (3x)</option>
-                    <option value="4.0" selected>超清 (4x)</option>
-                    <option value="6.0">极清 (6x)</option>
-                    <option value="8.0">最高 (8x)</option>
-                </select>
-                <div class="quality-info" id="qualityInfo">当前质量: 4x</div>
-            </div>
-            <div class="quality-selector">
-                <label for="pdfExportQuality">PDF导出质量:</label>
-                <select id="pdfExportQuality">
-                    <option value="1.0">标准质量</option>
-                    <option value="1.5">高质量</option>
-                    <option value="2.0" selected>超高质量</option>
-                </select>
-                <div class="quality-info" id="pdfExportQualityInfo">当前PDF质量: 超高质量</div>
-            </div>
-            <div class="quality-selector">
-                <label for="autoCrop">自动裁剪空白:</label>
-                <input type="checkbox" id="autoCrop" checked>
-                <div class="quality-info">自动检测并裁剪PDF中的空白区域（某些发票可能需要关闭此选项）</div>
-            </div>
-            <div class="quality-selector">
-                <button class="btn btn-info" onclick="toggleDebugMode()" style="padding: 8px 16px; font-size: 14px;">
-                    🐛 调试模式
-                </button>
-                <div class="quality-info">开启后可在控制台查看详细的检测信息</div>
-            </div>
-            <div class="quality-selector">
-                <button class="btn btn-warning" onclick="clearCache()" style="padding: 8px 16px; font-size: 14px;">
-                    🗑️ 清理缓存
-                </button>
-                <div class="quality-info">清理PDF缓存和释放内存</div>
-            </div>
-            <div class="progress-container" id="progressContainer" style="display: none; margin: 15px 0;">
-                <div class="progress-bar">
-                    <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
+
+            <!-- 质量选择器 -->
+            <div class="quality-selectors-container mb-4 md:mb-8">
+                <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-2 gap-3 md:gap-4">
+                    <div class="quality-selector rounded-lg p-3 bg-white/80 backdrop-blur-sm border border-red-100 hover:border-red-200 transition-all duration-300">
+                        <label class="block text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1">
+                            <span class="text-red-500 text-xs">⚙️</span>
+                            PDF渲染质量
+                        </label>
+                        <select id="pdfQuality" class="w-full px-2 py-1 text-xs border border-gray-200 rounded focus:ring-2 focus:ring-red-500 focus:border-transparent bg-white/90 backdrop-blur-sm">
+                            <option value="2.0">标准 (2x)</option>
+                            <option value="3.0">高清 (3x)</option>
+                            <option value="4.0" selected>超清 (4x)</option>
+                            <option value="6.0">极清 (6x)</option>
+                            <option value="8.0">最高 (8x)</option>
+                        </select>
+                        <div class="text-xs text-gray-500 mt-1 flex items-center gap-1" id="qualityInfo">
+                            <span class="text-blue-400 text-xs">ℹ️</span>
+                            当前: 4x
+                        </div>
+                    </div>
+
+                    <div class="quality-selector rounded-lg p-3 bg-white/80 backdrop-blur-sm border border-red-100 hover:border-red-200 transition-all duration-300">
+                        <label class="block text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1">
+                            <span class="text-green-500 text-xs">📤</span>
+                            PDF导出质量
+                        </label>
+                        <select id="pdfExportQuality" class="w-full px-2 py-1 text-xs border border-gray-200 rounded focus:ring-2 focus:ring-red-500 focus:border-transparent bg-white/90 backdrop-blur-sm">
+                            <option value="1.0">标准质量</option>
+                            <option value="1.5">高质量</option>
+                            <option value="2.0" selected>超高质量</option>
+                        </select>
+                        <div class="text-xs text-gray-500 mt-1 flex items-center gap-1" id="pdfExportQualityInfo">
+                            <span class="text-blue-400 text-xs">ℹ️</span>
+                            超高质量
+                        </div>
+                    </div>
+
+                    <div class="quality-selector rounded-lg p-3 bg-white/80 backdrop-blur-sm border border-red-100 hover:border-red-200 transition-all duration-300">
+                        <label class="block text-xs font-semibold text-gray-700 mb-1 flex items-center gap-1">
+                            <span class="text-purple-500 text-xs">⚏</span>
+                            布局模式
+                        </label>
+                        <select id="layoutMode" onchange="onLayoutModeChange()" class="w-full px-2 py-1 text-xs border border-gray-200 rounded focus:ring-2 focus:ring-red-500 focus:border-transparent bg-white/90 backdrop-blur-sm">
+                            <option value="landscape" selected>横版2x2</option>
+                            <option value="portrait">竖版3列</option>
+                        </select>
+                        <div class="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                            <span class="text-blue-400 text-xs">ℹ️</span>
+                            横版网格, 竖版列
+                        </div>
+                    </div>
+
+                    <div class="quality-selector rounded-lg p-3 bg-white/80 backdrop-blur-sm border border-red-100 hover:border-red-200 transition-all duration-300">
+                        <label class="flex items-center gap-2 text-xs font-semibold text-gray-700 cursor-pointer hover:text-red-600 transition-colors">
+                            <input type="checkbox" id="autoCrop" checked class="w-4 h-4 text-red-600 rounded focus:ring-2 focus:ring-red-500 focus:ring-offset-2">
+                            <span class="text-orange-500 text-xs">✂️</span>
+                            <span>自动裁剪</span>
+                        </label>
+                        <div class="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                            <span class="text-blue-400 text-xs">ℹ️</span>
+                            自动裁剪空白
+                        </div>
+                    </div>
                 </div>
-                <div class="progress-text" id="progressText">处理中...</div>
             </div>
         </div>
 
-        <div class="canvas-container">
+        <!-- 分页控件 - 固定在页面中间下方 -->
+        <div class="pagination-controls fixed rounded-xl p-4 md:p-6 flex items-center justify-center gap-4 md:gap-6 shadow-glow animate-slide-up hidden md:flex"
+            style="animation-delay: 0.15s;">
+            <button
+                class="page-btn px-4 md:px-6 py-2 md:py-3 rounded-lg text-sm md:text-base font-medium text-gray-700 flex items-center gap-2"
+                onclick="prevPage()" id="prevPageBtn" disabled>
+                <span>◀️</span>
+                <span>上一页</span>
+            </button>
+
+            <div class="page-info px-4 md:px-6 py-2 md:py-3 rounded-lg text-sm md:text-base font-bold text-gray-700 min-w-[120px] md:min-w-[160px] text-center"
+                id="pageInfo">
+                第 1 页 / 共 1 页
+            </div>
+
+            <button
+                class="page-btn px-4 md:px-6 py-2 md:py-3 rounded-lg text-sm md:text-base font-medium text-gray-700 flex items-center gap-2"
+                onclick="nextPage()" id="nextPageBtn" disabled>
+                <span>下一页</span>
+                <span>▶️</span>
+            </button>
+        </div>
+
+        <!-- 移动端分页控件 -->
+        <div class="pagination-controls-mobile fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-3 flex items-center justify-center gap-3 md:hidden z-50">
+            <button
+                class="page-btn px-3 py-2 rounded-lg text-sm font-medium text-gray-700 flex items-center gap-1 flex-1"
+                onclick="prevPage()" id="prevPageBtnMobile" disabled>
+                <span>◀️</span>
+                <span>上一页</span>
+            </button>
+
+            <div class="page-info px-3 py-2 rounded-lg text-sm font-bold text-gray-700 text-center flex-1"
+                id="pageInfoMobile">
+                第 1 页 / 共 1 页
+            </div>
+
+            <button
+                class="page-btn px-3 py-2 rounded-lg text-sm font-medium text-gray-700 flex items-center gap-1 flex-1"
+                onclick="nextPage()" id="nextPageBtnMobile" disabled>
+                <span>下一页</span>
+                <span>▶️</span>
+            </button>
+        </div>
+
+        <!-- 画布区域 -->
+        <div class="canvas-wrapper rounded-xl md:rounded-2xl p-4 md:p-6 shadow-glow animate-slide-up"
+            style="animation-delay: 0.2s;">
             <canvas id="canvas" width="2480" height="3508"></canvas>
         </div>
 
-        <div class="status" id="status"></div>
-    </div>
+        <!-- 图片信息区域 -->
+        <div class="image-info" id="imageInfo" style="display: none;"></div>
+
+        <!-- 状态栏 -->
+        <div class="glass-panel rounded-xl p-4 flex items-center justify-between text-sm text-gray-600 animate-slide-up"
+            style="animation-delay: 0.3s;">
+            <div class="flex items-center gap-2">
+                <div class="status-dot"></div>
+                <span id="status">就绪</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <div class="status-dot"></div>
+                <span>系统正常</span>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- 隐藏的文件输入 -->
+    <input type="file" id="mainFileInput" accept="image/*,.pdf" multiple style="display: none;">
+    <input type="file" id="imageInput" accept="image/*" multiple style="display: none;">
+    <input type="file" id="pdfInput" accept="application/pdf" multiple style="display: none;">
 
     <script>
+        // 移动端菜单切换
+        function toggleMobileMenu() {
+            const menu = document.getElementById('mobileMenu');
+            menu.classList.toggle('hidden');
+        }
+
+        // 荣耀浏览器简单修复
+        setTimeout(() => {
+            const nav = document.querySelector('nav');
+            const canvas = document.querySelector('#canvas');
+            const pagination = document.querySelector('.pagination-controls');
+            const paginationMobile = document.querySelector('.pagination-controls-mobile');
+            
+            // 强制重绘，防止重复显示
+            [nav, canvas, pagination, paginationMobile].forEach(el => {
+                if (el) {
+                    el.style.display = 'none';
+                    el.offsetHeight; // 触发重绘
+                    el.style.display = '';
+                }
+            });
+        }, 500);
+
+        // 获取DOM元素
+        const mainFileInput = document.getElementById('mainFileInput');
+        const imageInput = document.getElementById('imageInput');
+        const pdfInput = document.getElementById('pdfInput');
+
         // A4尺寸设置 (21cm x 29.7cm, 300 DPI 高清)
-        const A4_WIDTH = 2480;  // 21cm * 300 DPI / 2.54
-        const A4_HEIGHT = 3508; // 29.7cm * 300 DPI / 2.54
+        const A4_WIDTH = 2480;  // 21cm * 300 DPI / 2.54 (竖版)
+        const A4_HEIGHT = 3508; // 29.7cm * 300 DPI / 2.54 (竖版)
+        const A4_LANDSCAPE_WIDTH = 3508;  // 29.7cm * 300 DPI / 2.54 (横版)
+        const A4_LANDSCAPE_HEIGHT = 2480; // 21cm * 300 DPI / 2.54 (横版)
+
+        // 布局模式相关变量
+        let currentLayoutMode = 'landscape'; // 'portrait' 或 'landscape'，默认横版
+
+        // 三列竖版布局常量
         const SECTION_HEIGHT = A4_HEIGHT / 3; // 每张图片的高度
         const INVOICE_SPACING = 20; // 发票之间的间隔距离（像素）
         const INVOICE_LINE_HEIGHT = 3; // 分隔线高度（像素）
         const MAX_IMAGES_PER_PAGE = 3; // 每页最多图片数量
+
+        // 横版布局常量（2x2网格）
+        const LANDSCAPE_SECTION_WIDTH = A4_LANDSCAPE_WIDTH / 2; // 每张图片的宽度
+        const LANDSCAPE_SECTION_HEIGHT = A4_LANDSCAPE_HEIGHT / 2; // 每张图片的高度
+        const LANDSCAPE_INVOICE_SPACING = 15; // 横版发票之间的间隔距离（像素）
+        const LANDSCAPE_MAX_IMAGES_PER_PAGE = 4; // 横版每页最多图片数量
+
         const MAX_PAGES = 10; // 最多页数限制
-        
+
         const canvas = document.getElementById('canvas');
         const ctx = canvas.getContext('2d');
-        const mainFileInput = document.getElementById('mainFileInput');
-        const imageInput = document.getElementById('imageInput');
-        const pdfInput = document.getElementById('pdfInput');
         const exportBtn = document.getElementById('exportBtn');
-
+        const exportPdfBtn = document.getElementById('exportPdfBtn');
         const previewBtn = document.getElementById('previewBtn');
+        const printPreviewBtn = document.getElementById('printPreviewBtn');
         const status = document.getElementById('status');
         const imageInfo = document.getElementById('imageInfo');
         const pdfQualitySelect = document.getElementById('pdfQuality');
         const qualityInfo = document.getElementById('qualityInfo');
-        const exportPdfBtn = document.getElementById('exportPdfBtn');
+
+        // 获取续加按钮
+        const addImageButton = document.querySelector('button[onclick*="imageInput"]');
+        const addPdfButton = document.querySelector('button[onclick*="pdfInput"]');
+        const mainFileButton = document.querySelector('button[onclick*="mainFileInput"]');
 
         // 获取当前PDF渲染质量
         function getPdfRenderScale() {
-            return parseFloat(pdfQualitySelect.value);
+            return pdfQualitySelect ? parseFloat(pdfQualitySelect.value) : 4.0;
         }
 
         // 获取是否启用自动裁剪
         function isAutoCropEnabled() {
-            return document.getElementById('autoCrop').checked;
+            const autoCropElement = document.getElementById('autoCrop');
+            return autoCropElement ? autoCropElement.checked : true;
         }
 
         // 获取PDF导出质量
         function getPdfExportQuality() {
-            return parseFloat(document.getElementById('pdfExportQuality').value);
+            const pdfExportQualityElement = document.getElementById('pdfExportQuality');
+            return pdfExportQualityElement ? parseFloat(pdfExportQualityElement.value) : 2.0;
+        }
+
+        // 获取当前布局模式
+        function getCurrentLayoutMode() {
+            const layoutModeElement = document.getElementById('layoutMode');
+            return layoutModeElement ? layoutModeElement.value : 'landscape';
+        }
+
+        // 获取当前布局的最大图片数
+        function getMaxImagesPerPage() {
+            return getCurrentLayoutMode() === 'landscape' ? LANDSCAPE_MAX_IMAGES_PER_PAGE : MAX_IMAGES_PER_PAGE;
+        }
+
+        // 获取当前画布尺寸（始终保持相同尺寸，不随布局模式改变）
+        function getCurrentCanvasSize() {
+            // 始终返回竖版A4尺寸，不随布局模式改变
+            return { width: A4_WIDTH, height: A4_HEIGHT };
+        }
+
+        // 初始化按钮状态（页面初次加载时）
+        function initializeButtonStates() {
+            const hasImages = uploadedImages.length > 0;
+            
+            // 主文件选择按钮
+            if (mainFileButton) {
+                mainFileButton.disabled = hasImages;
+                if (hasImages) {
+                    mainFileButton.classList.add('btn-disabled');
+                    mainFileButton.classList.remove('btn-active');
+                } else {
+                    mainFileButton.classList.remove('btn-disabled');
+                    mainFileButton.classList.remove('btn-active');
+                }
+            }
+            
+            // 续加按钮
+            if (addImageButton) {
+                addImageButton.disabled = !hasImages;
+                if (hasImages) {
+                    addImageButton.classList.remove('btn-disabled');
+                    addImageButton.classList.add('btn-active');
+                } else {
+                    addImageButton.classList.add('btn-disabled');
+                    addImageButton.classList.remove('btn-active');
+                }
+            }
+            
+            if (addPdfButton) {
+                addPdfButton.disabled = !hasImages;
+                if (hasImages) {
+                    addPdfButton.classList.remove('btn-disabled');
+                    addPdfButton.classList.add('btn-active');
+                } else {
+                    addPdfButton.classList.add('btn-disabled');
+                    addPdfButton.classList.remove('btn-active');
+                }
+            }
+            
+            // 导出和清空按钮
+            if (exportBtn) {
+                exportBtn.disabled = !hasImages;
+                if (hasImages) {
+                    exportBtn.classList.remove('btn-disabled');
+                    exportBtn.classList.add('btn-active');
+                } else {
+                    exportBtn.classList.add('btn-disabled');
+                    exportBtn.classList.remove('btn-active');
+                }
+            }
+            
+            if (exportPdfBtn) {
+                exportPdfBtn.disabled = !hasImages;
+                if (hasImages) {
+                    exportPdfBtn.classList.remove('btn-disabled');
+                    exportPdfBtn.classList.add('btn-active');
+                } else {
+                    exportPdfBtn.classList.add('btn-disabled');
+                    exportPdfBtn.classList.remove('btn-active');
+                }
+            }
+            
+            if (previewBtn) {
+                previewBtn.disabled = !hasImages;
+                if (hasImages) {
+                    previewBtn.classList.remove('btn-disabled');
+                    previewBtn.classList.add('btn-active');
+                } else {
+                    previewBtn.classList.add('btn-disabled');
+                    previewBtn.classList.remove('btn-active');
+                }
+            }
+            
+            if (printPreviewBtn) {
+                printPreviewBtn.disabled = !hasImages;
+                if (hasImages) {
+                    printPreviewBtn.classList.remove('btn-disabled');
+                    printPreviewBtn.classList.add('btn-active');
+                } else {
+                    printPreviewBtn.classList.add('btn-disabled');
+                    printPreviewBtn.classList.remove('btn-active');
+                }
+            }
+        }
+
+        // 清空画布后的按钮状态
+        function initializeButtonStatesAfterClear() {
+            // 清空后的状态：续加功能可用，初始文件选择也可用
+            addImageButton.disabled = false;
+            addPdfButton.disabled = false;
+            exportBtn.disabled = true;
+            exportPdfBtn.disabled = true;
+            previewBtn.disabled = true;
+            printPreviewBtn.disabled = true;
+            mainFileButton.disabled = false;
+        }
+
+        // 更新按钮状态（有文件时）
+        function updateButtonStatesWithFiles() {
+            // 有文件时：续加和清空功能可用，初始文件选择不可用
+            
+            // 主文件选择按钮 - 低亮
+            if (mainFileButton) {
+                mainFileButton.disabled = true;
+                mainFileButton.classList.add('btn-disabled');
+                mainFileButton.classList.remove('btn-active');
+                // 移除所有颜色主题
+                mainFileButton.classList.remove('export-image', 'export-pdf', 'print-preview', 'add-image', 'add-pdf', 'clear-canvas');
+            }
+            
+            // 续加图片按钮 - 橙色主题
+            if (addImageButton) {
+                addImageButton.disabled = false;
+                addImageButton.classList.remove('btn-disabled');
+                addImageButton.classList.add('btn-active', 'add-image');
+                // 移除其他主题
+                addImageButton.classList.remove('export-image', 'export-pdf', 'print-preview', 'add-pdf', 'clear-canvas');
+            }
+            
+            // 续加PDF按钮 - 粉色主题
+            if (addPdfButton) {
+                addPdfButton.disabled = false;
+                addPdfButton.classList.remove('btn-disabled');
+                addPdfButton.classList.add('btn-active', 'add-pdf');
+                // 移除其他主题
+                addPdfButton.classList.remove('export-image', 'export-pdf', 'print-preview', 'add-image', 'clear-canvas');
+            }
+            
+            // 导出图片按钮 - 绿色主题（桌面端和移动端）
+            if (exportBtn) {
+                exportBtn.disabled = false;
+                exportBtn.classList.remove('btn-disabled');
+                exportBtn.classList.add('btn-active', 'export-image');
+                exportBtn.classList.remove('export-pdf', 'print-preview', 'add-image', 'add-pdf', 'clear-canvas');
+            }
+            
+            // 移动端导出图片按钮
+            const mobileExportBtn = document.querySelector('.mobile-export-btn');
+            if (mobileExportBtn) {
+                mobileExportBtn.disabled = false;
+            }
+            
+            // 导出PDF按钮 - 蓝色主题（桌面端和移动端）
+            if (exportPdfBtn) {
+                exportPdfBtn.disabled = false;
+                exportPdfBtn.classList.remove('btn-disabled');
+                exportPdfBtn.classList.add('btn-active', 'export-pdf');
+                exportPdfBtn.classList.remove('export-image', 'print-preview', 'add-image', 'add-pdf', 'clear-canvas');
+            }
+            
+            // 移动端导出PDF按钮
+            const mobileExportPdfBtn = document.querySelector('.mobile-export-pdf-btn');
+            if (mobileExportPdfBtn) {
+                mobileExportPdfBtn.disabled = false;
+            }
+            
+            // 打印预览按钮 - 紫色主题（桌面端和移动端）
+            if (printPreviewBtn) {
+                printPreviewBtn.disabled = false;
+                printPreviewBtn.classList.remove('btn-disabled');
+                printPreviewBtn.classList.add('btn-active', 'print-preview');
+                printPreviewBtn.classList.remove('export-image', 'export-pdf', 'add-image', 'add-pdf', 'clear-canvas');
+            }
+            
+            // 移动端打印预览按钮
+            const mobilePrintPreviewBtn = document.querySelector('.mobile-print-preview-btn');
+            if (mobilePrintPreviewBtn) {
+                mobilePrintPreviewBtn.disabled = false;
+            }
+            
+            // 清空页面按钮 - 黄色主题
+            if (previewBtn) {
+                previewBtn.disabled = false;
+                previewBtn.classList.remove('btn-disabled');
+                previewBtn.classList.add('btn-active', 'clear-canvas');
+                previewBtn.classList.remove('export-image', 'export-pdf', 'print-preview', 'add-image', 'add-pdf');
+            }
+        }
+
+        // 布局模式切换处理函数
+        function onLayoutModeChange() {
+            const newMode = getCurrentLayoutMode();
+            if (newMode !== currentLayoutMode) {
+                currentLayoutMode = newMode;
+
+                // 重新初始化画布（画布尺寸会根据布局模式改变）
+                initCanvas();
+
+                // 调试信息
+                const canvasSize = getCurrentCanvasSize();
+                console.log(`布局切换到: ${newMode}, 画布尺寸: ${canvasSize.width} x ${canvasSize.height}`);
+
+                // 重新计算总页数
+                if (uploadedImages.length > 0) {
+                    totalPages = Math.ceil(uploadedImages.length / getMaxImagesPerPage());
+                    currentPage = Math.min(currentPage, Math.max(0, totalPages - 1));
+
+                    // 更新分页控件
+                    updatePaginationButtons();
+                    updatePageInfo();
+
+                    // 重新绘制当前页
+                    drawCurrentPage();
+                }
+
+                showStatus(`已切换到${newMode === 'landscape' ? '两行两列横版' : '三列竖版'}布局`, 'success');
+            }
         }
 
         // 切换调试模式
@@ -488,33 +1117,85 @@
                 console.log('=== 发票检测调试模式已关闭 ===');
             }
         }
-        
+
         // 进度条管理
         const progressBar = {
             container: document.getElementById('progressContainer'),
             fill: document.getElementById('progressFill'),
             text: document.getElementById('progressText'),
-            
+            startTime: null,
+            totalFiles: 0,
+
             show() {
                 this.container.style.display = 'block';
+                this.startTime = Date.now();
             },
-            
+
             hide() {
                 this.container.style.display = 'none';
+                this.startTime = null;
+                this.totalFiles = 0;
             },
-            
-            update(percent, message) {
+
+            update(percent, message, fileName = '') {
                 this.fill.style.width = percent + '%';
-                this.text.textContent = message;
+
+                // 计算剩余时间估算
+                let timeEstimate = '';
+                if (this.startTime && this.totalFiles > 0 && percent > 0) {
+                    const elapsed = Date.now() - this.startTime;
+                    const totalEstimated = (elapsed / percent) * 100;
+                    const remaining = Math.max(0, totalEstimated - elapsed);
+                    const remainingSeconds = Math.ceil(remaining / 1000);
+
+                    if (remainingSeconds > 0 && remainingSeconds < 300) { // 只显示5分钟内的估算
+                        timeEstimate = ` (预计剩余 ${remainingSeconds} 秒)`;
+                    }
+                }
+
+                // 格式化消息
+                let fullMessage = message;
+                if (fileName) {
+                    fullMessage = `${message} - ${fileName}`;
+                }
+                fullMessage += timeEstimate;
+
+                this.text.textContent = fullMessage;
             },
-            
-            increment(increment, message) {
+
+            setTotal(total) {
+                this.totalFiles = total;
+            },
+
+            increment(increment, message, fileName = '') {
                 const currentWidth = parseFloat(this.fill.style.width) || 0;
                 const newWidth = Math.min(100, currentWidth + increment);
-                this.update(newWidth, message);
+                this.update(newWidth, message, fileName);
+            },
+
+            // 新增：显示文件处理详情
+            showFileProgress(currentIndex, totalFiles, fileName, status = '处理中') {
+                const percent = Math.round((currentIndex / totalFiles) * 100);
+                const message = `正在${status}第 ${currentIndex}/${totalFiles} 个PDF文件`;
+                this.update(percent, message, fileName);
+            },
+
+            // 新增：显示处理阶段
+            showStage(stage, percent = null) {
+                const stageMessages = {
+                    'loading': '正在加载PDF文件',
+                    'rendering': '正在渲染PDF内容',
+                    'cropping': '正在检测并裁剪空白区域',
+                    'converting': '正在转换为图片',
+                    'finalizing': '正在完成处理'
+                };
+
+                const message = stageMessages[stage] || stage;
+                const currentPercent = percent !== null ? percent : parseFloat(this.fill.style.width) || 0;
+                this.update(currentPercent, message);
             }
         };
-        
+
         // 防抖函数
         function debounce(func, wait) {
             let timeout;
@@ -527,35 +1208,35 @@
                 timeout = setTimeout(later, wait);
             };
         }
-        
+
         // 清理缓存
         function clearCache() {
             performanceMonitor.start('缓存清理');
-            
+
             // 清理PDF缓存
             pdfCache.clear();
-            
+
             // 清理图片缓存
             memoryManager.clearImageCache();
-            
+
             // 优化canvas
             memoryManager.optimizeCanvas();
-            
+
             // 强制垃圾回收
             performanceMonitor.cleanup();
-            
+
             // 检查内存
             const memory = performanceMonitor.checkMemory();
-            
+
             performanceMonitor.end('缓存清理');
-            
+
             showStatus(`缓存清理完成，当前内存使用: ${memory ? memory.used + 'MB' : '未知'}`, 'success');
-            
+
             if (debugMode) {
                 console.log('🧹 缓存清理完成');
             }
         }
-        
+
         // 优化的状态显示（防抖）
         const debouncedShowStatus = debounce((message, type = 'info') => {
             showStatus(message, type);
@@ -564,19 +1245,29 @@
         // 更新质量信息显示
         function updateQualityInfo() {
             const scale = getPdfRenderScale();
-            qualityInfo.textContent = `当前质量: ${scale}x`;
+            if (qualityInfo) {
+                qualityInfo.textContent = `当前质量: ${scale}x`;
+            }
         }
 
         // 更新PDF导出质量信息显示
         function updatePdfExportQualityInfo() {
             const quality = getPdfExportQuality();
             const qualityText = quality === 1.0 ? '标准质量' : quality === 1.5 ? '高质量' : '超高质量';
-            document.getElementById('pdfExportQualityInfo').textContent = `当前PDF质量: ${qualityText}`;
+            const pdfExportQualityInfoElement = document.getElementById('pdfExportQualityInfo');
+            if (pdfExportQualityInfoElement) {
+                pdfExportQualityInfoElement.textContent = `当前PDF质量: ${qualityText}`;
+            }
         }
 
         // 监听质量选择变化
-        pdfQualitySelect.addEventListener('change', updateQualityInfo);
-        document.getElementById('pdfExportQuality').addEventListener('change', updatePdfExportQualityInfo);
+        if (pdfQualitySelect) {
+            pdfQualitySelect.addEventListener('change', updateQualityInfo);
+        }
+        const pdfExportQualityElement = document.getElementById('pdfExportQuality');
+        if (pdfExportQualityElement) {
+            pdfExportQualityElement.addEventListener('change', updatePdfExportQualityInfo);
+        }
 
         let uploadedImages = [];
         let uploadedPdfs = [];
@@ -584,19 +1275,19 @@
         let currentPage = 0; // 当前显示页
         let totalPages = 1; // 总页数
         let debugMode = false; // 调试模式开关
-        
+
         // 性能监控
         const performanceMonitor = {
             startTime: 0,
             memoryUsage: [],
-            
+
             start(operation) {
                 this.startTime = performance.now();
                 if (debugMode) {
                     console.log(`🚀 开始 ${operation}`);
                 }
             },
-            
+
             end(operation) {
                 const duration = performance.now() - this.startTime;
                 if (debugMode) {
@@ -604,7 +1295,7 @@
                 }
                 return duration;
             },
-            
+
             checkMemory() {
                 if (performance.memory) {
                     const memory = {
@@ -612,17 +1303,17 @@
                         total: Math.round(performance.memory.totalJSHeapSize / 1024 / 1024),
                         limit: Math.round(performance.memory.jsHeapSizeLimit / 1024 / 1024)
                     };
-                    
+
                     if (debugMode) {
                         console.log(`💾 内存使用: ${memory.used}MB / ${memory.total}MB (限制: ${memory.limit}MB)`);
                     }
-                    
+
                     this.memoryUsage.push(memory);
                     return memory;
                 }
                 return null;
             },
-            
+
             cleanup() {
                 // 强制垃圾回收（如果可用）
                 if (window.gc) {
@@ -633,11 +1324,11 @@
                 }
             }
         };
-        
+
         // 内存管理工具
         const memoryManager = {
             maxCacheSize: 50 * 1024 * 1024, // 50MB缓存限制
-            
+
             clearImageCache() {
                 // 清理未使用的图片缓存
                 uploadedImages = uploadedImages.filter((img, index) => {
@@ -647,12 +1338,12 @@
                     }
                     return keep;
                 });
-                
+
                 if (debugMode) {
                     console.log('🧹 清理图片缓存');
                 }
             },
-            
+
             optimizeCanvas() {
                 // 优化canvas内存使用
                 const tempCanvas = document.createElement('canvas');
@@ -660,10 +1351,10 @@
                 tempCanvas.height = canvas.height;
                 const tempCtx = tempCanvas.getContext('2d');
                 tempCtx.drawImage(canvas, 0, 0);
-                
+
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 ctx.drawImage(tempCanvas, 0, 0);
-                
+
                 if (debugMode) {
                     console.log('🎨 优化canvas内存');
                 }
@@ -672,57 +1363,89 @@
 
         // 设置PDF.js worker路径和CMap配置
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-        
+
         // 配置CMap以支持中文等非ASCII字符（多个备用CDN源）
         const cMapUrls = [
             'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/',
             'https://unpkg.com/pdfjs-dist@3.11.174/cmaps/',
             'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/'
         ];
-        
+
         // 使用第一个可用的CDN源
         pdfjsLib.cMapUrl = cMapUrls[0];
         pdfjsLib.cMapPacked = true;
 
         // 初始化画布
         function initCanvas() {
+            // 获取当前布局的画布尺寸
+            const canvasSize = getCurrentCanvasSize();
+
             // 设置canvas的实际像素尺寸（300 DPI）
-            canvas.width = A4_WIDTH;
-            canvas.height = A4_HEIGHT;
-            
-            // 设置canvas的CSS显示尺寸（缩放到适合屏幕）
-            const displayScale = Math.min(window.innerWidth / A4_WIDTH * 0.8, 1);
-            canvas.style.width = (A4_WIDTH * displayScale) + 'px';
-            canvas.style.height = (A4_HEIGHT * displayScale) + 'px';
-            
+            canvas.width = canvasSize.width;
+            canvas.height = canvasSize.height;
+
+            // 设置canvas的CSS显示尺寸（缩放到适合屏幕，保持横纵比）
+            const maxWidth = window.innerWidth * 0.8;
+            const maxHeight = window.innerHeight * 1.1312;
+            const scale = Math.min(maxWidth / canvasSize.width, maxHeight / canvasSize.height, 1);
+            canvas.style.width = (canvasSize.width * scale) + 'px';
+            canvas.style.height = (canvasSize.height * scale) + 'px';
+
             // 重置变换矩阵
             ctx.setTransform(1, 0, 0, 1, 0, 0);
-            
+
             // 启用最高质量渲染
             ctx.imageSmoothingEnabled = true;
             ctx.imageSmoothingQuality = 'high';
             ctx.textRenderingOptimization = 'optimizeQuality';
-            
+
             // 设置高质量渲染参数
             ctx.fillStyle = 'white';
-            ctx.fillRect(0, 0, A4_WIDTH, A4_HEIGHT);
-            
-            // 绘制发票间隔和黑线
-            for (let i = 1; i < 3; i++) {
-                const y = i * SECTION_HEIGHT;
-                
-                // 绘制间隔区域（白色背景）
-                ctx.fillStyle = 'white';
-                ctx.fillRect(0, y - INVOICE_SPACING/2, A4_WIDTH, INVOICE_SPACING);
-                
-                // 绘制黑线
-                ctx.strokeStyle = 'black';
-                ctx.lineWidth = INVOICE_LINE_HEIGHT;
+            ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
+
+            // 根据布局模式绘制分隔线
+            const layoutMode = getCurrentLayoutMode();
+
+            if (layoutMode === 'landscape') {
+                // 横版布局：2*2网格，只绘制十字分隔线
+                ctx.strokeStyle = '#d0d0d0'; // 浅灰白色
+                ctx.lineWidth = 3; // 边框线条粗细
                 ctx.setLineDash([]); // 实线
+
+                // 计算十字线位置：将画布分成2行2列
+                const centerX = canvasSize.width / 2; // 垂直分隔线位置
+                const centerY = canvasSize.height / 2; // 水平分隔线位置
+
+                // 绘制垂直分隔线（将画布分成左右两部分）
                 ctx.beginPath();
-                ctx.moveTo(0, y);
-                ctx.lineTo(A4_WIDTH, y);
+                ctx.moveTo(centerX, 0);
+                ctx.lineTo(centerX, canvasSize.height);
                 ctx.stroke();
+
+                // 绘制水平分隔线（将画布分成上下两部分）
+                ctx.beginPath();
+                ctx.moveTo(0, centerY);
+                ctx.lineTo(canvasSize.width, centerY);
+                ctx.stroke();
+
+            } else {
+                // 竖版布局：三列，绘制水平分隔线
+                for (let i = 1; i < 3; i++) {
+                    const y = i * SECTION_HEIGHT;
+
+                    // 绘制间隔区域（白色背景）
+                    ctx.fillStyle = 'white';
+                    ctx.fillRect(0, y - INVOICE_SPACING / 2, canvasSize.width, INVOICE_SPACING);
+
+                    // 绘制黑线
+                    ctx.strokeStyle = '#d0d0d0'; // 浅灰白色
+                    ctx.lineWidth = INVOICE_LINE_HEIGHT;
+                    ctx.setLineDash([]); // 实线
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(canvasSize.width, y);
+                    ctx.stroke();
+                }
             }
         }
 
@@ -735,19 +1458,19 @@
         // 更新图片信息显示
         function updateImageInfo() {
             imageInfo.innerHTML = '';
-            
+
             // 显示图片信息
             uploadedImages.forEach((img, index) => {
                 const item = document.createElement('div');
                 item.className = 'image-item';
-                
+
                 const preview = document.createElement('img');
                 preview.src = img.src;
                 preview.alt = `图片 ${index + 1}`;
-                
+
                 const info = document.createElement('p');
                 info.textContent = `图片 ${index + 1}: ${img.naturalWidth} × ${img.naturalHeight}`;
-                
+
                 item.appendChild(preview);
                 item.appendChild(info);
                 imageInfo.appendChild(item);
@@ -757,42 +1480,42 @@
             uploadedPdfs.forEach((pdfData, index) => {
                 const item = document.createElement('div');
                 item.className = 'image-item';
-                
+
                 const preview = document.createElement('img');
                 preview.src = pdfData.preview;
                 preview.alt = `PDF ${index + 1}`;
-                
+
                 const info = document.createElement('p');
                 info.textContent = `PDF ${index + 1}: ${pdfData.width} × ${pdfData.height}`;
-                
+
                 const fileName = document.createElement('p');
                 fileName.textContent = pdfData.fileName || `文件 ${index + 1}`;
                 fileName.style.fontSize = '10px';
                 fileName.style.color = '#666';
                 fileName.style.fontWeight = 'bold';
-                
+
                 const pageInfo = document.createElement('p');
                 pageInfo.textContent = `页面: ${pdfData.pageNumber}`;
                 pageInfo.style.fontSize = '10px';
                 pageInfo.style.color = '#999';
-                
+
                 // 显示裁剪信息
                 if (pdfData.originalSize && pdfData.croppedSize) {
                     const cropInfo = document.createElement('p');
                     cropInfo.textContent = `原始: ${pdfData.originalSize}`;
                     cropInfo.style.fontSize = '9px';
                     cropInfo.style.color = '#999';
-                    
+
                     const finalInfo = document.createElement('p');
                     finalInfo.textContent = `裁剪: ${pdfData.croppedSize}`;
                     finalInfo.style.fontSize = '9px';
                     finalInfo.style.color = '#28a745';
                     finalInfo.style.fontWeight = 'bold';
-                    
+
                     item.appendChild(cropInfo);
                     item.appendChild(finalInfo);
                 }
-                
+
                 item.appendChild(preview);
                 item.appendChild(info);
                 item.appendChild(fileName);
@@ -827,16 +1550,19 @@
         // 3. Add PDF Input (Append Only)
         pdfInput.addEventListener('change', async function (e) {
             const files = Array.from(e.target.files);
+            console.log('📄 续加PDF文件:', files.length, '个文件');
             if (files.length === 0) return;
+            console.log('📄 调用handleFiles处理PDF...');
             await handleFiles(files, true, false); // Process PDFs only
             pdfInput.value = ''; // Reset input
+            console.log('✅ PDF续加处理完成');
         });
 
         // Universal file handler function
         async function handleFiles(files, processPdf = true, processImage = true) {
             // 检查总文件数量限制
             const totalAfterUpload = uploadedImages.length + files.length;
-            const maxTotalFiles = MAX_IMAGES_PER_PAGE * MAX_PAGES;
+            const maxTotalFiles = getMaxImagesPerPage() * MAX_PAGES;
             if (totalAfterUpload > maxTotalFiles) {
                 showStatus(`最多只能处理${maxTotalFiles}个文件，当前已有${uploadedImages.length}个`, 'error');
                 return;
@@ -889,12 +1615,12 @@
             const ctx = canvas.getContext('2d');
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const data = imageData.data;
-            
+
             let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0;
             let hasContent = false;
             let totalBrightness = 0;
             let pixelCount = 0;
-            
+
             // 首先计算整体亮度分布
             for (let y = 0; y < canvas.height; y++) {
                 for (let x = 0; x < canvas.width; x++) {
@@ -907,7 +1633,7 @@
                     pixelCount++;
                 }
             }
-            
+
             const avgBrightness = totalBrightness / pixelCount;
             if (debugMode) {
                 console.log('=== 内容检测调试信息 ===');
@@ -915,13 +1641,13 @@
                 console.log('总像素数:', pixelCount);
                 console.log('平均亮度:', avgBrightness.toFixed(2));
             }
-            
+
             // 根据平均亮度动态调整白色阈值
             const whiteThreshold = Math.max(240, avgBrightness + 30);
             if (debugMode) {
                 console.log('白色阈值:', whiteThreshold);
             }
-            
+
             // 重新遍历像素数据，寻找非白色像素
             for (let y = 0; y < canvas.height; y++) {
                 for (let x = 0; x < canvas.width; x++) {
@@ -930,12 +1656,12 @@
                     const g = data[index + 1];
                     const b = data[index + 2];
                     const a = data[index + 3];
-                    
+
                     // 跳过完全透明的像素
                     if (a === 0) continue;
-                    
+
                     const brightness = (r + g + b) / 3;
-                    
+
                     // 更智能的内容检测：
                     // 1. 亮度低于阈值
                     // 2. 或者RGB值差异较大（彩色内容）
@@ -943,7 +1669,7 @@
                     const hasLowBrightness = brightness < whiteThreshold;
                     const hasColorVariation = Math.abs(r - g) > 15 || Math.abs(g - b) > 15 || Math.abs(r - b) > 15;
                     const isDarkContent = (r < 200 && g < 200 && b < 200);
-                    
+
                     if (hasLowBrightness || hasColorVariation || isDarkContent) {
                         hasContent = true;
                         minX = Math.min(minX, x);
@@ -953,14 +1679,14 @@
                     }
                 }
             }
-            
+
             if (!hasContent) {
                 if (debugMode) {
                     console.log('未检测到内容，返回完整画布');
                 }
                 return null; // 没有检测到内容，返回null表示不裁剪
             }
-            
+
             // 添加一些边距
             const margin = 15;
             const bounds = {
@@ -969,7 +1695,7 @@
                 width: Math.min(canvas.width - minX, maxX - minX + 2 * margin),
                 height: Math.min(canvas.height - minY, maxY - minY + 2 * margin)
             };
-            
+
             if (debugMode) {
                 console.log('检测到的内容边界:', bounds);
                 console.log('内容区域占比:', ((bounds.width * bounds.height) / (canvas.width * canvas.height) * 100).toFixed(2) + '%');
@@ -982,10 +1708,10 @@
             const ctx = canvas.getContext('2d');
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const data = imageData.data;
-            
+
             let minX = canvas.width, minY = canvas.height, maxX = 0, maxY = 0;
             let hasContent = false;
-            
+
             // 使用非常宽松的检测条件
             for (let y = 0; y < canvas.height; y++) {
                 for (let x = 0; x < canvas.width; x++) {
@@ -994,13 +1720,13 @@
                     const g = data[index + 1];
                     const b = data[index + 2];
                     const a = data[index + 3];
-                    
+
                     // 跳过完全透明的像素
                     if (a === 0) continue;
-                    
+
                     // 非常宽松的条件：只要不是接近纯白色就认为是内容
                     const isNearWhite = (r > 245 && g > 245 && b > 245);
-                    
+
                     if (!isNearWhite) {
                         hasContent = true;
                         minX = Math.min(minX, x);
@@ -1010,12 +1736,12 @@
                     }
                 }
             }
-            
+
             if (!hasContent) {
                 console.log('备用检测：未检测到内容');
                 return null;
             }
-            
+
             // 添加较大的边距
             const margin = 25;
             const bounds = {
@@ -1024,7 +1750,7 @@
                 width: Math.min(canvas.width - minX, maxX - minX + 2 * margin),
                 height: Math.min(canvas.height - minY, maxY - minY + 2 * margin)
             };
-            
+
             console.log('备用检测到的内容边界:', bounds);
             return bounds;
         }
@@ -1032,36 +1758,36 @@
         // 裁剪图片到内容区域
         function cropToContent(canvas, bounds) {
             if (!bounds) return canvas;
-            
+
             const croppedCanvas = document.createElement('canvas');
             const croppedCtx = croppedCanvas.getContext('2d');
-            
+
             croppedCanvas.width = bounds.width;
             croppedCanvas.height = bounds.height;
-            
+
             // 绘制裁剪后的内容
             croppedCtx.drawImage(
                 canvas,
                 bounds.x, bounds.y, bounds.width, bounds.height,
                 0, 0, bounds.width, bounds.height
             );
-            
+
             return croppedCanvas;
         }
 
         // PDF处理缓存
         const pdfCache = new Map();
-        
+
         // 检测图像中是否已有红色边框
         async function checkForRedBorder(canvas) {
             const ctx = canvas.getContext('2d');
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const data = imageData.data;
-            
+
             const borderWidth = Math.min(20, Math.min(canvas.width, canvas.height) / 10); // 边框检测宽度
             let redPixelCount = 0;
             let totalBorderPixels = 0;
-            
+
             // 检查上边框
             for (let x = 0; x < canvas.width; x++) {
                 for (let y = 0; y < borderWidth; y++) {
@@ -1069,7 +1795,7 @@
                     const r = data[index];
                     const g = data[index + 1];
                     const b = data[index + 2];
-                    
+
                     totalBorderPixels++;
                     // 检测红色像素 (R值高，G和B值低)
                     if (r > 150 && g < 100 && b < 100) {
@@ -1077,7 +1803,7 @@
                     }
                 }
             }
-            
+
             // 检查下边框
             for (let x = 0; x < canvas.width; x++) {
                 for (let y = canvas.height - borderWidth; y < canvas.height; y++) {
@@ -1085,14 +1811,14 @@
                     const r = data[index];
                     const g = data[index + 1];
                     const b = data[index + 2];
-                    
+
                     totalBorderPixels++;
                     if (r > 150 && g < 100 && b < 100) {
                         redPixelCount++;
                     }
                 }
             }
-            
+
             // 检查左边框
             for (let x = 0; x < borderWidth; x++) {
                 for (let y = 0; y < canvas.height; y++) {
@@ -1100,14 +1826,14 @@
                     const r = data[index];
                     const g = data[index + 1];
                     const b = data[index + 2];
-                    
+
                     totalBorderPixels++;
                     if (r > 150 && g < 100 && b < 100) {
                         redPixelCount++;
                     }
                 }
             }
-            
+
             // 检查右边框
             for (let x = canvas.width - borderWidth; x < canvas.width; x++) {
                 for (let y = 0; y < canvas.height; y++) {
@@ -1115,20 +1841,20 @@
                     const r = data[index];
                     const g = data[index + 1];
                     const b = data[index + 2];
-                    
+
                     totalBorderPixels++;
                     if (r > 150 && g < 100 && b < 100) {
                         redPixelCount++;
                     }
                 }
             }
-            
+
             const redPixelRatio = redPixelCount / totalBorderPixels;
-            
+
             if (debugMode) {
                 console.log(`红色边框检测: 红色像素 ${redPixelCount}/${totalBorderPixels}, 比例: ${(redPixelRatio * 100).toFixed(2)}%`);
             }
-            
+
             // 如果红色像素占比超过10%，认为有红色边框
             return redPixelRatio > 0.1;
         }
@@ -1137,28 +1863,28 @@
         function addRedBorder(canvas) {
             const newCanvas = document.createElement('canvas');
             const newCtx = newCanvas.getContext('2d');
-            
+
             // 设置新画布尺寸（添加边框空间）
             const borderSize = Math.max(10, Math.min(canvas.width, canvas.height) * 0.02); // 边框厚度
             newCanvas.width = canvas.width + 2 * borderSize;
             newCanvas.height = canvas.height + 2 * borderSize;
-            
+
             // 填充白色背景
             newCtx.fillStyle = 'white';
             newCtx.fillRect(0, 0, newCanvas.width, newCanvas.height);
-            
+
             // 绘制红色边框
             newCtx.strokeStyle = '#FF0000'; // 鲜红色
             newCtx.lineWidth = borderSize;
             newCtx.strokeRect(borderSize / 2, borderSize / 2, canvas.width + borderSize, canvas.height + borderSize);
-            
+
             // 绘制原始图像
             newCtx.drawImage(canvas, borderSize, borderSize, canvas.width, canvas.height);
-            
+
             if (debugMode) {
                 console.log(`已添加红色边框，边框厚度: ${borderSize}px`);
             }
-            
+
             return newCanvas;
         }
 
@@ -1167,7 +1893,7 @@
             try {
                 // 检查PDF元数据
                 const metadata = await pdf.getMetadata();
-                
+
                 // 检查是否有签名信息
                 if (metadata.info && metadata.info.Subject) {
                     const subject = metadata.info.Subject.toLowerCase();
@@ -1175,7 +1901,7 @@
                         return true;
                     }
                 }
-                
+
                 // 检查PDF权限
                 if (pdf.loadingTask && pdf.loadingTask._worker) {
                     try {
@@ -1188,16 +1914,16 @@
                         return true;
                     }
                 }
-                
+
                 // 检查是否包含acroform字段（签名通常使用表单字段）
                 try {
                     const numPages = pdf.numPages;
                     for (let i = 1; i <= Math.min(numPages, 3); i++) { // 只检查前3页
                         const page = await pdf.getPage(i);
                         const annotations = await page.getAnnotations();
-                        
+
                         for (const annotation of annotations) {
-                            if (annotation.subtype === 'Widget' && 
+                            if (annotation.subtype === 'Widget' &&
                                 (annotation.fieldType === 'Sig' || annotation.fieldName.toLowerCase().includes('sign'))) {
                                 return true;
                             }
@@ -1207,9 +1933,9 @@
                     // 如果无法获取注释，可能是签名PDF
                     return true;
                 }
-                
+
                 return false;
-                
+
             } catch (error) {
                 if (debugMode) {
                     console.log('数字签名检测失败:', error.message);
@@ -1218,144 +1944,165 @@
                 return true;
             }
         }
-        
+
         // 处理多个PDF文件（优化版）
         async function processMultiplePDFs(files) {
+            console.log('🔄 开始处理PDF文件:', files.length, '个');
+            console.log('🔄 当前uploadedImages数量:', uploadedImages.length);
+
             performanceMonitor.start('PDF批量处理');
             performanceMonitor.checkMemory();
-            
+
             try {
                 progressBar.show();
                 progressBar.update(0, `准备处理 ${files.length} 个PDF文件...`);
-                
+
                 // 检查剩余槽位
-                const remainingSlots = MAX_IMAGES_PER_PAGE * MAX_PAGES - uploadedImages.length;
+                const remainingSlots = getMaxImagesPerPage() * MAX_PAGES - uploadedImages.length;
+                console.log('🔄 剩余槽位:', remainingSlots);
                 if (remainingSlots <= 0) {
-                    showStatus(`已达到最多${MAX_IMAGES_PER_PAGE * MAX_PAGES}个文件的限制。如需继续，请先清空画布。`, 'error');
+                    showStatus(`已达到最多${getMaxImagesPerPage() * MAX_PAGES}个文件的限制。如需继续，请先清空画布。`, 'error');
+                    progressBar.hide();
                     return;
                 }
 
                 // 只处理能容纳的文件数量
                 const filesToProcess = files.slice(0, Math.max(0, remainingSlots));
                 if (filesToProcess.length < files.length) {
-                    showStatus(`本次最多还能添加 ${remainingSlots} 个文件（总计不超过${MAX_IMAGES_PER_PAGE * MAX_PAGES}个）`, 'info');
+                    showStatus(`本次最多还能添加 ${remainingSlots} 个文件（总计不超过${getMaxImagesPerPage() * MAX_PAGES}个）`, 'info');
                 }
-                
+
+                console.log('🔄 实际要处理的文件数量:', filesToProcess.length);
+
+                // 现在可以安全地设置总文件数
+                progressBar.setTotal(filesToProcess.length);
+
                 const renderScale = getPdfRenderScale();
                 const startIndex = uploadedImages.length; // 记录新增文件的起始位置
-                
-                // 并发处理PDF文件（限制并发数为3）
-                const concurrencyLimit = 3;
-                const chunks = [];
-                for (let i = 0; i < filesToProcess.length; i += concurrencyLimit) {
-                    chunks.push(filesToProcess.slice(i, i + concurrencyLimit));
-                }
-                
-                let processedCount = 0;
-                const progressIncrement = 100 / filesToProcess.length;
-                
-                for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
-                    const chunk = chunks[chunkIndex];
-                    
-                    // 并发处理当前批次
-                    const promises = chunk.map(async (file, index) => {
-                        const globalIndex = startIndex + filesToProcess.indexOf(file);
-                        return await processSinglePDF(file, globalIndex, renderScale, chunkIndex);
-                    });
-                    
-                    // 等待当前批次完成
-                    const results = await Promise.allSettled(promises);
-                    
-                    // 处理结果
-                    for (const result of results) {
-                        if (result.status === 'fulfilled') {
-                            processedCount++;
-                            progressBar.increment(progressIncrement, `已处理 ${processedCount}/${filesToProcess.length} 个PDF文件...`);
-                        } else {
-                            console.error('PDF处理失败:', result.reason);
-                            debouncedShowStatus(`PDF处理失败: ${result.reason.message}`, 'error');
-                        }
+                let processedCount = 0; // 声明处理计数器
+
+                // 同步处理PDF文件（一步一步处理）
+                for (let i = 0; i < filesToProcess.length; i++) {
+                    const file = filesToProcess[i];
+                    const globalIndex = startIndex + i;
+
+                    console.log(`📄 处理文件 ${file.name}，目标索引: ${globalIndex}`);
+
+                    // 使用增强的进度条显示
+                    progressBar.showFileProgress(i + 1, filesToProcess.length, file.name, '处理');
+
+                    try {
+                        await processSinglePDF(file, globalIndex, renderScale, i);
+                        processedCount++;
+                        console.log(`✅ PDF ${i + 1} 处理成功: ${file.name}`);
+                    } catch (error) {
+                        console.error(`❌ PDF ${i + 1} 处理失败: ${file.name}`, error);
+                        showStatus(`PDF处理失败: ${file.name} - ${error.message}`, 'error');
                     }
-                    
-                    // 批次间短暂休息，避免阻塞UI
-                    await new Promise(resolve => setTimeout(resolve, 50));
+
+                    // 短暂延迟，让UI有机会更新
+                    await new Promise(resolve => setTimeout(resolve, 100));
                 }
-                
+
                 // 完成处理
                 if (processedCount === filesToProcess.length) {
-                    progressBar.update(100, '处理完成，正在更新界面...');
-                    
+                    progressBar.showStage('finalizing', 100);
+
+                    console.log('✅ PDF处理完成，processedCount:', processedCount);
+                    console.log('✅ 处理后uploadedImages数量:', uploadedImages.length);
+
                     // 更新总页数
-                    totalPages = Math.ceil(uploadedImages.length / MAX_IMAGES_PER_PAGE);
+                    totalPages = Math.ceil(uploadedImages.length / getMaxImagesPerPage());
+                    console.log('✅ 更新总页数:', totalPages);
 
-                    // 显示或隐藏分页控件
-                    const paginationControls = document.getElementById('paginationControls');
-                    if (totalPages > 1) {
-                        paginationControls.style.display = 'block';
-                        updatePaginationButtons();
-                        updatePageInfo();
-                    }
+                    // 自动跳转到新添加PDF的最后一页
+                    currentPage = Math.max(0, totalPages - 1);
+                    console.log('✅ 跳转到页面:', currentPage);
 
-                    drawCurrentPage();
+                    // 更新分页控件
+                    updatePaginationButtons();
+                    updatePageInfo();
+
+                    console.log('✅ 开始绘制当前页...');
+                    drawCurrentPage(true); // 显示删除按钮
                     updateImageInfo();
-                    exportBtn.disabled = false;
-                    exportPdfBtn.disabled = false;
-                    previewBtn.disabled = false;
-                    document.getElementById('reprocessBtn').style.display = 'inline-flex';
-                    
+
+                    // 更新按钮状态
+                    updateButtonStatesWithFiles();
+
+
                     performanceMonitor.end('PDF批量处理');
                     performanceMonitor.checkMemory();
                     performanceMonitor.cleanup();
-                    
+
                     progressBar.hide();
                     showStatus(`成功处理 ${filesToProcess.length} 个PDF文件，渲染质量: ${renderScale}x，共 ${totalPages} 页`, 'success');
                 } else {
                     progressBar.hide();
                     showStatus(`部分处理完成：${processedCount}/${filesToProcess.length} 个PDF文件`, 'warning');
                 }
-                
+
             } catch (error) {
                 progressBar.hide();
                 showStatus('PDF处理失败，请检查文件格式或尝试关闭自动裁剪', 'error');
                 console.error('PDF processing error:', error);
-                
+
                 // 如果是CMap错误，提供具体的解决建议
                 if (error.message && error.message.includes('CMap')) {
                     showStatus('PDF字体加载失败，建议：1) 开启调试模式查看详情 2) 尝试关闭自动裁剪', 'warning');
                 }
             }
         }
-        
+
         // 处理单个PDF文件
         async function processSinglePDF(file, targetIndex, renderScale, chunkIndex) {
             performanceMonitor.start(`PDF处理 ${targetIndex + 1}`);
-            
+
             try {
                 console.log(`处理PDF ${targetIndex + 1}: ${file.name}`);
-                
+
+                // 显示加载进度
+                if (chunkIndex === 0) {
+                    progressBar.showStage('loading');
+                }
+
                 // 检查缓存
                 const cacheKey = `${file.name}_${file.size}_${renderScale}`;
                 if (pdfCache.has(cacheKey)) {
                     if (debugMode) {
                         console.log(`📦 使用缓存: ${file.name}`);
                     }
-                    return pdfCache.get(cacheKey);
+                    const cachedImg = pdfCache.get(cacheKey);
+                    // 即使使用缓存，也要将图片添加到正确的索引位置
+                    console.log(`📝 PDF ${targetIndex + 1} 从缓存添加到uploadedImages[${targetIndex}]`);
+                    uploadedImages[targetIndex] = cachedImg;
+                    uploadedPdfs[targetIndex] = {
+                        preview: cachedImg.src,
+                        width: cachedImg.naturalWidth,
+                        height: cachedImg.naturalHeight,
+                        pageNumber: 1,
+                        fileName: file.name,
+                        originalSize: `${cachedImg.naturalWidth} × ${cachedImg.naturalHeight}`,
+                        croppedSize: '使用缓存'
+                    };
+                    console.log(`✅ PDF ${targetIndex + 1} 从缓存完成处理: ${file.name}`);
+                    return cachedImg;
                 }
-                
+
                 const arrayBuffer = await file.arrayBuffer();
-                
+
                 // 尝试多个CDN源加载PDF
                 let pdf = null;
-                
+
                 for (let cMapIndex = 0; cMapIndex < cMapUrls.length; cMapIndex++) {
                     const cMapUrl = cMapUrls[cMapIndex];
                     const standardFontUrl = cMapUrl.replace('/cmaps/', '/standard_fonts/');
-                    
+
                     try {
                         if (debugMode) {
                             console.log(`PDF ${targetIndex + 1} 尝试使用CDN源 ${cMapIndex + 1}: ${cMapUrl}`);
                         }
-                        
+
                         const loadingTask = pdfjsLib.getDocument({
                             data: arrayBuffer,
                             cMapUrl: cMapUrl,
@@ -1375,18 +2122,18 @@
                             useSystemFonts: true,
                             useWorkerFetch: true
                         });
-                        
+
                         pdf = await loadingTask.promise;
                         if (debugMode) {
                             console.log(`PDF ${targetIndex + 1} CDN ${cMapIndex + 1} 加载成功`);
                         }
                         break;
-                        
+
                     } catch (error) {
                         console.warn(`PDF ${targetIndex + 1} CDN ${cMapIndex + 1} 加载失败:`, error.message);
                     }
                 }
-                
+
                 // 备用方案
                 if (!pdf) {
                     const fallbackTask = pdfjsLib.getDocument({
@@ -1399,14 +2146,15 @@
                         isEvalSupported: true,
                         useSystemFonts: true
                     });
-                    
+
                     pdf = await fallbackTask.promise;
                 }
-                
+
                 // 渲染页面
+                progressBar.showStage('rendering');
                 const page = await pdf.getPage(1);
                 const viewport = page.getViewport({ scale: renderScale });
-                
+
                 // 检测是否为数字签名PDF
                 const isDigitalSigned = await checkDigitalSignature(pdf);
                 if (isDigitalSigned) {
@@ -1418,22 +2166,22 @@
                         showStatus('检测到数字签名PDF，正在使用增强渲染模式。如果红色边框不显示，请尝试关闭自动裁剪选项。', 'info');
                     }
                 }
-                
+
                 const tempCanvas = document.createElement('canvas');
                 const tempCtx = tempCanvas.getContext('2d');
                 tempCanvas.width = viewport.width;
                 tempCanvas.height = viewport.height;
-                
+
                 tempCtx.imageSmoothingEnabled = true;
                 tempCtx.imageSmoothingQuality = 'high';
                 tempCtx.textRenderingOptimization = 'optimizeQuality';
                 tempCtx.fillStyle = 'white';
                 tempCtx.fillRect(0, 0, viewport.width, viewport.height);
-                
+
                 // 尝试多种渲染方式以支持数字签名PDF
                 let renderSuccess = false;
                 const renderIntents = ['display', 'print', undefined]; // 尝试不同的渲染意图
-                
+
                 for (const intent of renderIntents) {
                     try {
                         const renderParams = {
@@ -1441,24 +2189,24 @@
                             viewport: viewport,
                             background: 'white'
                         };
-                        
+
                         // 只有在intent不是undefined时才添加
                         if (intent !== undefined) {
                             renderParams.intent = intent;
                         }
-                        
+
                         if (debugMode) {
                             console.log(`PDF ${targetIndex + 1} 尝试渲染意图: ${intent || 'default'}`);
                         }
-                        
+
                         await page.render(renderParams).promise;
                         renderSuccess = true;
-                        
+
                         if (debugMode) {
                             console.log(`PDF ${targetIndex + 1} 渲染成功，使用意图: ${intent || 'default'}`);
                         }
                         break;
-                        
+
                     } catch (renderError) {
                         if (debugMode) {
                             console.warn(`PDF ${targetIndex + 1} 渲染意图 ${intent || 'default'} 失败:`, renderError.message);
@@ -1466,25 +2214,25 @@
                         continue;
                     }
                 }
-                
+
                 // 如果所有渲染意图都失败，尝试最基础的渲染
                 if (!renderSuccess) {
                     try {
                         if (debugMode) {
                             console.log(`PDF ${targetIndex + 1} 使用最基础渲染方式`);
                         }
-                        
+
                         await page.render({
                             canvasContext: tempCtx,
                             viewport: viewport
                         }).promise;
-                        
+
                         renderSuccess = true;
-                        
+
                         if (debugMode) {
                             console.log(`PDF ${targetIndex + 1} 基础渲染成功`);
                         }
-                        
+
                     } catch (basicRenderError) {
                         if (debugMode) {
                             console.error(`PDF ${targetIndex + 1} 所有渲染方式都失败:`, basicRenderError.message);
@@ -1492,16 +2240,17 @@
                         throw basicRenderError;
                     }
                 }
-                
+
                 // 内容检测
                 let contentBounds = null;
                 if (isAutoCropEnabled()) {
+                    progressBar.showStage('cropping');
                     contentBounds = detectContentBounds(tempCanvas);
                     if (!contentBounds) {
                         contentBounds = detectContentBoundsRelaxed(tempCanvas);
                     }
                 }
-                
+
                 // 裁剪
                 let finalCanvas = tempCanvas;
                 if (contentBounds && isAutoCropEnabled()) {
@@ -1510,7 +2259,7 @@
                         finalCanvas = tempCanvas;
                     }
                 }
-                
+
                 // 自动添加红色边框功能已关闭
                 // if (isDigitalSigned) {
                 //     if (debugMode) {
@@ -1534,11 +2283,14 @@
                 //         }
                 //     }
                 // }
-                
+
                 // 转换为图片
+                progressBar.showStage('converting');
                 const result = await new Promise((resolve) => {
                     const img = new Image();
                     img.onload = () => {
+                        console.log(`🖼️ PDF ${targetIndex + 1} 图片加载成功，尺寸: ${img.naturalWidth}x${img.naturalHeight}`);
+                        console.log(`📝 PDF ${targetIndex + 1} 添加到uploadedImages[${targetIndex}]`);
                         uploadedImages[targetIndex] = img;
                         uploadedPdfs[targetIndex] = {
                             preview: finalCanvas.toDataURL('image/png', 1.0),
@@ -1549,17 +2301,23 @@
                             originalSize: `${viewport.width} × ${viewport.height}`,
                             croppedSize: contentBounds ? `${finalCanvas.width} × ${finalCanvas.height}` : '未裁剪'
                         };
+                        console.log(`✅ PDF ${targetIndex + 1} 完全处理完成: ${file.name}`);
                         resolve(img);
                     };
+                    img.onerror = (error) => {
+                        console.error(`❌ PDF ${targetIndex + 1} 图片加载失败:`, error);
+                        reject(new Error(`图片加载失败: ${error}`));
+                    };
+                    console.log(`🎨 PDF ${targetIndex + 1} 开始转换为图片...`);
                     img.src = finalCanvas.toDataURL('image/png', 1.0);
                 });
-                
+
                 // 缓存结果
                 pdfCache.set(cacheKey, result);
-                
+
                 performanceMonitor.end(`PDF处理 ${targetIndex + 1}`);
                 return result;
-                
+
             } catch (error) {
                 performanceMonitor.end(`PDF处理 ${targetIndex + 1} (失败)`);
                 throw error;
@@ -1567,71 +2325,245 @@
         }
 
         // 绘制当前页内容
-        function drawCurrentPage() {
+        function drawCurrentPage(showDeleteButtons = true) {
             initCanvas();
-            
+
+            // 清除之前的删除按钮位置
+            window.deleteButtons = [];
+
             // 启用最高质量图像渲染
             ctx.imageSmoothingEnabled = true;
             ctx.imageSmoothingQuality = 'high';
             ctx.textRenderingOptimization = 'optimizeQuality';
-            
+
+            // 获取当前画布尺寸
+            const canvasSize = getCurrentCanvasSize();
+
             // 计算当前页的图片范围
-            const startIndex = currentPage * MAX_IMAGES_PER_PAGE;
-            const endIndex = Math.min(startIndex + MAX_IMAGES_PER_PAGE, uploadedImages.length);
+            const maxImagesPerPage = getMaxImagesPerPage();
+            const startIndex = currentPage * maxImagesPerPage;
+            const endIndex = Math.min(startIndex + maxImagesPerPage, uploadedImages.length);
+
+            const layoutMode = getCurrentLayoutMode();
 
             for (let i = startIndex; i < endIndex; i++) {
                 const img = uploadedImages[i];
                 if (!img) continue;
 
-                const pagePosition = i % MAX_IMAGES_PER_PAGE;
-                
-                // 计算实际可用高度（考虑间隔）
-                const availableHeight = SECTION_HEIGHT - INVOICE_SPACING;
-                const y = pagePosition * SECTION_HEIGHT + INVOICE_SPACING / 2;
-                
-                // 计算图片尺寸，保持宽高比
-                const imgAspectRatio = img.naturalWidth / img.naturalHeight;
-                const sectionAspectRatio = A4_WIDTH / availableHeight;
-                
-                let drawWidth, drawHeight, drawX, drawY;
-                
-                if (imgAspectRatio > sectionAspectRatio) {
-                    // 图片更宽，以宽度为准
-                    drawWidth = A4_WIDTH;
-                    drawHeight = A4_WIDTH / imgAspectRatio;
-                    drawX = 0;
-                    drawY = y + (availableHeight - drawHeight) / 2;
-                } else {
-                    // 图片更高，以高度为准
-                    drawHeight = availableHeight;
-                    drawWidth = availableHeight * imgAspectRatio;
-                    drawX = (A4_WIDTH - drawWidth) / 2;
-                    drawY = y;
-                }
-                
-                // 绘制图片（使用高质量渲染）
-                ctx.save();
-                ctx.imageSmoothingEnabled = true;
-                ctx.imageSmoothingQuality = 'high';
-                ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
-                ctx.restore();
-                
-                // 绘制边框
-                ctx.strokeStyle = '#999';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(drawX, drawY, drawWidth, drawHeight);
+                const pagePosition = i % maxImagesPerPage;
 
-                // 添加页码标记（右下角）
-                if (pagePosition === MAX_IMAGES_PER_PAGE - 1 || i === uploadedImages.length - 1) {
+                if (layoutMode === 'landscape') {
+                    // 横版布局：2x2网格，图片旋转90度并自适应
+                    const row = Math.floor(pagePosition / 2);
+                    const col = pagePosition % 2;
+
+                    // 计算每个格子的尺寸（画布的一半）
+                    const cellWidth = canvasSize.width / 2;
+                    const cellHeight = canvasSize.height / 2;
+
+                    // 计算位置（从左到右，从上到下）
+                    const x = col * cellWidth;
+                    const y = row * cellHeight;
+
+                    // 添加5像素内边距
+                    const padding = 5;
+                    const availableWidth = cellWidth - padding * 2;
+                    const availableHeight = cellHeight - padding * 2;
+
+                    // 保存当前状态
                     ctx.save();
-                    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-                    ctx.font = 'bold 48px Arial'; // 放大字体以匹配300 DPI
-                    ctx.textAlign = 'right';
-                    ctx.textBaseline = 'bottom';
-                    ctx.fillText(`第 ${currentPage + 1} 页`, A4_WIDTH - 40, A4_HEIGHT - 40);
+
+                    // 将图片旋转90度并居中显示（考虑内边距）
+                    ctx.translate(x + cellWidth / 2, y + cellHeight / 2);
+                    ctx.rotate(Math.PI / 2); // 旋转90度
+
+                    // 计算旋转后的图片尺寸，确保不超出格子（考虑内边距）
+                    // 旋转后，原来的宽度变成高度，原来的高度变成宽度
+                    const rotatedMaxWidth = availableHeight; // 旋转后的最大宽度（考虑内边距）
+                    const rotatedMaxHeight = availableWidth; // 旋转后的最大高度（考虑内边距）
+
+                    const imgAspectRatio = img.naturalWidth / img.naturalHeight;
+
+                    // 计算旋转后的显示尺寸
+                    let displayWidth, displayHeight;
+
+                    if (imgAspectRatio > rotatedMaxWidth / rotatedMaxHeight) {
+                        // 图片更宽，以旋转后的宽度为准
+                        displayWidth = rotatedMaxWidth;
+                        displayHeight = rotatedMaxWidth / imgAspectRatio;
+                    } else {
+                        // 图片更高，以旋转后的高度为准
+                        displayHeight = rotatedMaxHeight;
+                        displayWidth = rotatedMaxHeight * imgAspectRatio;
+                    }
+
+                    // 绘制旋转后的图片（从中心点绘制）
+                    ctx.drawImage(img,
+                        -displayWidth / 2,  // x偏移（负的宽度一半）
+                        -displayHeight / 2, // y偏移（负的高度一半）
+                        displayWidth,      // 显示宽度
+                        displayHeight      // 显示高度
+                    );
+
+                    // 恢复状态
                     ctx.restore();
+
+                    // 绘制删除按钮（仅在操作界面时显示）
+                    if (showDeleteButtons) {
+                        drawDeleteButton(ctx, x + cellWidth - 49, y + 5, i); // 调整位置，从-37改为-49
+                    }
+
+                } else {
+                    // 竖版布局：三列
+                    // 计算实际可用高度（考虑间隔）
+                    const availableHeight = SECTION_HEIGHT - INVOICE_SPACING;
+                    const y = pagePosition * SECTION_HEIGHT + INVOICE_SPACING / 2;
+
+                    // 计算图片尺寸，保持宽高比
+                    const imgAspectRatio = img.naturalWidth / img.naturalHeight;
+                    const sectionAspectRatio = canvasSize.width / availableHeight;
+
+                    let drawWidth, drawHeight, drawX, drawY;
+
+                    if (imgAspectRatio > sectionAspectRatio) {
+                        // 图片更宽，以宽度为准
+                        drawWidth = canvasSize.width;
+                        drawHeight = canvasSize.width / imgAspectRatio;
+                        drawX = 0;
+                        drawY = y + (availableHeight - drawHeight) / 2;
+                    } else {
+                        // 图片更高，以高度为准
+                        drawHeight = availableHeight;
+                        drawWidth = availableHeight * imgAspectRatio;
+                        drawX = (canvasSize.width - drawWidth) / 2;
+                        drawY = y;
+                    }
+
+                    // 绘制图片（使用高质量渲染）
+                    ctx.save();
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'high';
+                    ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+                    ctx.restore();
+
+                    // 绘制删除按钮（仅在操作界面时显示）
+                    if (showDeleteButtons) {
+                        drawDeleteButton(ctx, drawX + drawWidth - 49, drawY + 5, i); // 调整位置，从-37改为-49
+                    }
+
+                    // 绘制边框
+                    ctx.strokeStyle = '#999';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(drawX, drawY, drawWidth, drawHeight);
                 }
             }
+        }
+
+        // 绘制删除按钮
+        function drawDeleteButton(ctx, x, y, imageIndex) {
+            const buttonSize = 44; // 进一步增大按钮尺寸，从32改为44
+            const padding = 6;
+
+            // 绘制按钮背景（半透明红色）
+            ctx.fillStyle = 'rgba(220, 53, 69, 0.8)';
+            ctx.fillRect(x, y, buttonSize, buttonSize);
+
+            // 绘制边框
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x, y, buttonSize, buttonSize);
+
+            // 绘制 X 图标
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 4; // 进一步增粗线条
+            ctx.lineCap = 'round';
+
+            // 绘制 X 的两条线
+            ctx.beginPath();
+            ctx.moveTo(x + padding + 4, y + padding + 4);
+            ctx.lineTo(x + buttonSize - padding - 4, y + buttonSize - padding - 4);
+            ctx.moveTo(x + buttonSize - padding - 4, y + padding + 4);
+            ctx.lineTo(x + padding + 4, y + buttonSize - padding - 4);
+            ctx.stroke();
+
+            // 存储按钮位置信息用于点击检测
+            if (!window.deleteButtons) {
+                window.deleteButtons = [];
+            }
+            window.deleteButtons.push({
+                x: x,
+                y: y,
+                width: buttonSize,
+                height: buttonSize,
+                imageIndex: imageIndex
+            });
+        }
+
+        // 处理画布点击事件（用于删除按钮）
+        function handleCanvasClick(e) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+
+            const x = (e.clientX - rect.left) * scaleX;
+            const y = (e.clientY - rect.top) * scaleY;
+
+            // 检查是否点击了删除按钮
+            if (window.deleteButtons) {
+                for (const button of window.deleteButtons) {
+                    if (x >= button.x && x <= button.x + button.width &&
+                        y >= button.y && y <= button.y + button.height) {
+                        // 点击了删除按钮
+                        if (confirm(`确定要删除第 ${button.imageIndex + 1} 张发票吗？`)) {
+                            deleteSingleImage(button.imageIndex);
+                        }
+                        return;
+                    }
+                }
+            }
+        }
+
+        // 删除单张图片
+        function deleteSingleImage(index) {
+            if (index < 0 || index >= uploadedImages.length) return;
+
+            // 删除图片
+            uploadedImages.splice(index, 1);
+
+            // 如果有对应的PDF数据，也要删除
+            if (uploadedPdfs[index]) {
+                uploadedPdfs.splice(index, 1);
+            }
+
+            // 重新计算总页数
+            if (uploadedImages.length === 0) {
+                currentPage = 0;
+                totalPages = 1;
+                initializeButtonStates();
+            } else {
+                totalPages = Math.ceil(uploadedImages.length / getMaxImagesPerPage());
+
+                // 如果当前页超出了范围，调整到合适的页面
+                if (currentPage >= totalPages) {
+                    currentPage = totalPages - 1;
+                }
+
+                // 如果删除后当前页没有图片了，跳转到前一页
+                const maxImagesPerPage = getMaxImagesPerPage();
+                const startIndex = currentPage * maxImagesPerPage;
+                if (startIndex >= uploadedImages.length && currentPage > 0) {
+                    currentPage--;
+                }
+            }
+
+            // 更新界面
+            updatePaginationButtons();
+            updatePageInfo();
+            drawCurrentPage(true); // 显示删除按钮
+            updateImageInfo();
+            updateButtonStatesWithFiles();
+
+            showStatus(`已删除第 ${index + 1} 张发票（当前共 ${uploadedImages.length} 个）`, 'success');
         }
 
 
@@ -1655,31 +2587,39 @@
         // 导出单页PDF
         function exportSinglePDF() {
             try {
-                const quality = getPdfExportQuality();
-                const { jsPDF } = window.jspdf;
-                
-                // 创建A4尺寸的PDF
-                const pdf = new jsPDF({
-                    orientation: 'portrait',
-                    unit: 'mm',
-                    format: 'a4'
-                });
+                // 先隐藏删除按钮，然后导出
+                drawCurrentPage(false); // 隐藏删除按钮
 
-                // 获取当前页的高质量图像数据
-                const imageData = canvas.toDataURL('image/jpeg', quality);
-                
-                // 计算图像在PDF中的尺寸（A4: 210mm x 297mm）
-                const pdfWidth = 210;
-                const pdfHeight = 297;
-                
-                // 添加图像到PDF
-                pdf.addImage(imageData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-                
-                // 下载PDF
-                const fileName = `导出页面_${currentPage + 1}_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.pdf`;
-                pdf.save(fileName);
-                
-                showStatus('PDF导出成功！', 'success');
+                setTimeout(() => {
+                    const quality = getPdfExportQuality();
+                    const { jsPDF } = window.jspdf;
+
+                    // 始终使用竖版A4尺寸，不管布局模式如何
+                    const pdf = new jsPDF({
+                        orientation: 'portrait',
+                        unit: 'mm',
+                        format: 'a4'
+                    });
+
+                    // 使用当前画布的内容（已隐藏删除按钮）
+                    const imageData = canvas.toDataURL('image/jpeg', quality);
+
+                    // A4尺寸：210mm x 297mm
+                    const pdfWidth = 210; // 竖版宽度
+                    const pdfHeight = 297; // 竖版高度
+
+                    // 添加图像到PDF
+                    pdf.addImage(imageData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+
+                    // 下载PDF
+                    const fileName = `导出页面_${currentPage + 1}_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.pdf`;
+                    pdf.save(fileName);
+
+                    showStatus('PDF导出成功！', 'success');
+
+                    // 恢复删除按钮显示
+                    drawCurrentPage(true);
+                }, 100);
             } catch (error) {
                 showStatus('PDF导出失败，请重试', 'error');
                 console.error('Single PDF export error:', error);
@@ -1691,7 +2631,7 @@
             try {
                 const quality = getPdfExportQuality();
                 const { jsPDF } = window.jspdf;
-                
+
                 // 创建A4尺寸的PDF
                 const pdf = new jsPDF({
                     orientation: 'portrait',
@@ -1701,37 +2641,37 @@
 
                 const pdfWidth = 210;
                 const pdfHeight = 297;
-                
+
                 // 保存当前页
                 const originalPage = currentPage;
-                
+
                 // 为每页创建图像并添加到PDF
                 for (let page = 0; page < totalPages; page++) {
                     currentPage = page;
-                    drawCurrentPage();
-                    
+                    drawCurrentPage(false); // 隐藏删除按钮
+
                     // 获取当前页的图像数据
                     const imageData = canvas.toDataURL('image/jpeg', quality);
-                    
+
                     // 如果不是第一页，添加新页
                     if (page > 0) {
                         pdf.addPage();
                     }
-                    
+
                     // 添加图像到PDF
                     pdf.addImage(imageData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
                 }
-                
+
                 // 恢复当前页
                 currentPage = originalPage;
-                drawCurrentPage();
+                drawCurrentPage(true); // 显示删除按钮
                 updatePaginationButtons();
                 updatePageInfo();
-                
+
                 // 下载PDF
                 const fileName = `导出全部页面_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.pdf`;
                 pdf.save(fileName);
-                
+
                 showStatus(`成功导出 ${totalPages} 页PDF！`, 'success');
             } catch (error) {
                 showStatus('多页PDF导出失败，请重试', 'error');
@@ -1757,191 +2697,56 @@
 
         // 导出单页
         function exportSinglePage() {
-                const exportScale = 1; // 直接使用300 DPI，无需额外缩放
-                const exportCanvas = document.createElement('canvas');
-                const exportCtx = exportCanvas.getContext('2d');
-                
-                exportCanvas.width = A4_WIDTH;
-                exportCanvas.height = A4_HEIGHT;
-                
-                // 启用最高质量渲染
-                exportCtx.imageSmoothingEnabled = true;
-                exportCtx.imageSmoothingQuality = 'high';
-                exportCtx.textRenderingOptimization = 'optimizeQuality';
-                
-                // 绘制白色背景
-                exportCtx.fillStyle = 'white';
-                exportCtx.fillRect(0, 0, A4_WIDTH, A4_HEIGHT);
-                
-                // 绘制发票间隔和黑线
-                for (let i = 1; i < 3; i++) {
-                    const y = i * SECTION_HEIGHT;
-                    
-                    // 绘制间隔区域（白色背景）
-                    exportCtx.fillStyle = 'white';
-                    exportCtx.fillRect(0, y - INVOICE_SPACING/2, A4_WIDTH, INVOICE_SPACING);
-                    
-                    // 绘制黑线
-                    exportCtx.strokeStyle = 'black';
-                    exportCtx.lineWidth = INVOICE_LINE_HEIGHT;
-                    exportCtx.setLineDash([]); // 实线
-                    exportCtx.beginPath();
-                    exportCtx.moveTo(0, y);
-                    exportCtx.lineTo(A4_WIDTH, y);
-                    exportCtx.stroke();
-                }
-                
-            // 重新绘制当前页所有图片到高分辨率canvas
-            const startIndex = currentPage * MAX_IMAGES_PER_PAGE;
-            const endIndex = Math.min(startIndex + MAX_IMAGES_PER_PAGE, uploadedImages.length);
+            // 先隐藏删除按钮，然后导出
+            const originalState = window.deleteButtons;
+            drawCurrentPage(false); // 隐藏删除按钮
 
-            for (let i = startIndex; i < endIndex; i++) {
-                const img = uploadedImages[i];
-                if (!img) continue;
-
-                const pagePosition = i % MAX_IMAGES_PER_PAGE;
-                
-                // 计算实际可用高度（考虑间隔）
-                const availableHeight = SECTION_HEIGHT - INVOICE_SPACING;
-                const y = pagePosition * SECTION_HEIGHT + INVOICE_SPACING / 2;
-                    
-                    // 计算图片尺寸，保持宽高比
-                    const imgAspectRatio = img.naturalWidth / img.naturalHeight;
-                    const sectionAspectRatio = A4_WIDTH / availableHeight;
-                    
-                    let drawWidth, drawHeight, drawX, drawY;
-                    
-                    if (imgAspectRatio > sectionAspectRatio) {
-                        drawWidth = A4_WIDTH;
-                        drawHeight = A4_WIDTH / imgAspectRatio;
-                        drawX = 0;
-                        drawY = y + (availableHeight - drawHeight) / 2;
-                    } else {
-                        drawHeight = availableHeight;
-                        drawWidth = availableHeight * imgAspectRatio;
-                        drawX = (A4_WIDTH - drawWidth) / 2;
-                        drawY = y;
-                    }
-                    
-                    // 绘制图片（最高质量）
-                    exportCtx.save();
-                    exportCtx.imageSmoothingEnabled = true;
-                    exportCtx.imageSmoothingQuality = 'high';
-                    exportCtx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
-                    exportCtx.restore();
-                    
-                    // 绘制边框
-                    exportCtx.strokeStyle = '#999';
-                    exportCtx.lineWidth = 2;
-                    exportCtx.strokeRect(drawX, drawY, drawWidth, drawHeight);
-            }
-                
+            setTimeout(() => {
+                // 导出画布内容（使用当前画布，保持与PDF导出一致）
                 const link = document.createElement('a');
-            link.download = `导出页面_${currentPage + 1}_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.png`;
-            link.href = exportCanvas.toDataURL('image/png', 1.0); // 最高质量PNG
+                link.download = `导出页面_${currentPage + 1}_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.png`;
+                link.href = canvas.toDataURL('image/png', 1.0); // 最高质量PNG
                 link.click();
-            showStatus('单页导出成功！', 'success');
+                showStatus('单页导出成功！', 'success');
+
+                // 恢复删除按钮显示
+                drawCurrentPage(true);
+            }, 100);
         }
 
         // 导出多页（提示用户）
         function exportMultiplePages() {
             if (confirm(`检测到 ${totalPages} 页内容。是否要逐页导出所有页面？\n\n点击"确定"开始逐页导出，点击"取消"只导出当前页。`)) {
                 // 逐页导出所有页面
-                for (let page = 0; page < totalPages; page++) {
+                let exportedCount = 0;
+                const originalPage = currentPage;
+                
+                function exportNextPage() {
+                    if (exportedCount >= totalPages) {
+                        // 恢复到原始页面
+                        currentPage = originalPage;
+                        drawCurrentPage(true);
+                        showStatus(`所有 ${totalPages} 页已导出完成！`, 'success');
+                        return;
+                    }
+                    
+                    // 切换到要导出的页面
+                    currentPage = exportedCount;
+                    drawCurrentPage(false); // 隐藏删除按钮
+                    
                     setTimeout(() => {
-                        currentPage = page;
-                        drawCurrentPage();
-
-                        // 为每页创建单独的导出
-                        const exportScale = 1; // 直接使用300 DPI
-                        const exportCanvas = document.createElement('canvas');
-                        const exportCtx = exportCanvas.getContext('2d');
-
-                        exportCanvas.width = A4_WIDTH;
-                        exportCanvas.height = A4_HEIGHT;
-
-                        exportCtx.imageSmoothingEnabled = true;
-                        exportCtx.imageSmoothingQuality = 'high';
-                        exportCtx.textRenderingOptimization = 'optimizeQuality';
-                        exportCtx.fillStyle = 'white';
-                        exportCtx.fillRect(0, 0, A4_WIDTH, A4_HEIGHT);
-
-                        // 绘制发票间隔和黑线
-                        for (let i = 1; i < 3; i++) {
-                            const y = i * SECTION_HEIGHT;
-                            
-                            // 绘制间隔区域（白色背景）
-                            exportCtx.fillStyle = 'white';
-                            exportCtx.fillRect(0, y - INVOICE_SPACING/2, A4_WIDTH, INVOICE_SPACING);
-                            
-                            // 绘制黑线
-                            exportCtx.strokeStyle = 'black';
-                            exportCtx.lineWidth = INVOICE_LINE_HEIGHT;
-                            exportCtx.setLineDash([]); // 实线
-                            exportCtx.beginPath();
-                            exportCtx.moveTo(0, y);
-                            exportCtx.lineTo(A4_WIDTH, y);
-                            exportCtx.stroke();
-                        }
-                        
-                        // 绘制当前页内容
-                        const startIndex = page * MAX_IMAGES_PER_PAGE;
-                        const endIndex = Math.min(startIndex + MAX_IMAGES_PER_PAGE, uploadedImages.length);
-
-                        for (let i = startIndex; i < endIndex; i++) {
-                            const img = uploadedImages[i];
-                            if (!img) continue;
-
-                            const pagePosition = i % MAX_IMAGES_PER_PAGE;
-                            
-                            // 计算实际可用高度（考虑间隔）
-                            const availableHeight = SECTION_HEIGHT - INVOICE_SPACING;
-                            const y = pagePosition * SECTION_HEIGHT + INVOICE_SPACING / 2;
-
-                            const imgAspectRatio = img.naturalWidth / img.naturalHeight;
-                            const sectionAspectRatio = A4_WIDTH / availableHeight;
-
-                            let drawWidth, drawHeight, drawX, drawY;
-
-                            if (imgAspectRatio > sectionAspectRatio) {
-                                drawWidth = A4_WIDTH;
-                                drawHeight = A4_WIDTH / imgAspectRatio;
-                                drawX = 0;
-                                drawY = y + (availableHeight - drawHeight) / 2;
-                            } else {
-                                drawHeight = availableHeight;
-                                drawWidth = availableHeight * imgAspectRatio;
-                                drawX = (A4_WIDTH - drawWidth) / 2;
-                                drawY = y;
-                            }
-
-                            // 绘制图片（最高质量）
-                            exportCtx.save();
-                            exportCtx.imageSmoothingEnabled = true;
-                            exportCtx.imageSmoothingQuality = 'high';
-                            exportCtx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
-                            exportCtx.restore();
-                            
-                            exportCtx.strokeStyle = '#999';
-                            exportCtx.lineWidth = 2;
-                            exportCtx.strokeRect(drawX, drawY, drawWidth, drawHeight);
-                        }
-
+                        // 导出当前画布内容（保持与PDF导出一致）
                         const link = document.createElement('a');
-                        link.download = `导出页面_${page + 1}_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.png`;
-                        link.href = exportCanvas.toDataURL('image/png', 1.0); // 最高质量PNG
+                        link.download = `导出页面_${currentPage + 1}_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.png`;
+                        link.href = canvas.toDataURL('image/png', 1.0); // 最高质量PNG
                         link.click();
-
-                        if (page === totalPages - 1) {
-                            showStatus(`所有 ${totalPages} 页已导出完成！`, 'success');
-                            // 恢复当前显示页
-                            currentPage = 0;
-                            drawCurrentPage();
-                            updatePaginationButtons();
-                            updatePageInfo();
-                        }
-                    }, page * 500); // 延迟导出，避免浏览器阻塞
+                        
+                        exportedCount++;
+                        exportNextPage(); // 继续下一页
+                    }, 200);
                 }
+                
+                exportNextPage();
             } else {
                 // 只导出当前页
                 exportSinglePage();
@@ -1953,8 +2758,8 @@
             try {
                 if (totalPages === 1) {
                     // 单页直接打印
-                window.print();
-                showStatus('正在打开打印对话框...', 'success');
+                    window.print();
+                    showStatus('正在打开打印对话框...', 'success');
                 } else {
                     // 多页打印预览
                     previewPrint();
@@ -1982,12 +2787,13 @@
                     currentPage = page;
 
                     // 检查当前页是否有图片
-                    const startIndex = currentPage * MAX_IMAGES_PER_PAGE;
-                    const endIndex = Math.min(startIndex + MAX_IMAGES_PER_PAGE, uploadedImages.length);
+                    const maxImagesPerPage = getMaxImagesPerPage();
+                    const startIndex = currentPage * maxImagesPerPage;
+                    const endIndex = Math.min(startIndex + maxImagesPerPage, uploadedImages.length);
 
                     // 确保当前页有图片内容才生成预览
                     if (startIndex < uploadedImages.length && endIndex > startIndex) {
-                        drawCurrentPage();
+                        drawCurrentPage(false); // 隐藏删除按钮
                         const pageImage = canvas.toDataURL('image/png', 1.0);
                         actualPages++;
 
@@ -2002,7 +2808,7 @@
 
                 // 恢复当前页
                 currentPage = originalPage;
-                drawCurrentPage();
+                drawCurrentPage(true); // 显示删除按钮
 
                 const s = `
                     /* --- STYLES FOR PREVIEW WINDOW --- */
@@ -2157,7 +2963,7 @@
         function prevPage() {
             if (currentPage > 0) {
                 currentPage--;
-                drawCurrentPage();
+                drawCurrentPage(true); // 显示删除按钮
                 updatePaginationButtons();
                 updatePageInfo();
             }
@@ -2166,23 +2972,41 @@
         function nextPage() {
             if (currentPage < totalPages - 1) {
                 currentPage++;
-                drawCurrentPage();
+                drawCurrentPage(true); // 显示删除按钮
                 updatePaginationButtons();
                 updatePageInfo();
             }
         }
 
         function updatePaginationButtons() {
-            document.getElementById('prevPageBtn').disabled = currentPage === 0;
-            document.getElementById('nextPageBtn').disabled = currentPage === totalPages - 1;
+            const isDisabled = currentPage === 0;
+            const isNextDisabled = currentPage === totalPages - 1;
+            
+            // 桌面端按钮
+            document.getElementById('prevPageBtn').disabled = isDisabled;
+            document.getElementById('nextPageBtn').disabled = isNextDisabled;
+            
+            // 移动端按钮
+            const prevBtnMobile = document.getElementById('prevPageBtnMobile');
+            const nextBtnMobile = document.getElementById('nextPageBtnMobile');
+            if (prevBtnMobile) prevBtnMobile.disabled = isDisabled;
+            if (nextBtnMobile) nextBtnMobile.disabled = isNextDisabled;
         }
 
         function updatePageInfo() {
-            document.getElementById('pageInfo').textContent = `第 ${currentPage + 1} 页 / 共 ${totalPages} 页`;
+            const pageInfoText = `第 ${currentPage + 1} 页 / 共 ${totalPages} 页`;
+            
+            // 桌面端信息
+            document.getElementById('pageInfo').textContent = pageInfoText;
+            
+            // 移动端信息
+            const pageInfoMobile = document.getElementById('pageInfoMobile');
+            if (pageInfoMobile) pageInfoMobile.textContent = pageInfoText;
         }
 
         // 清空画布
         function clearCanvas() {
+            console.log('🧹 开始清空画布...');
             uploadedImages = [];
             uploadedPdfs = [];
             currentPdfFiles = [];
@@ -2190,17 +3014,17 @@
             totalPages = 1;
             initCanvas();
             updateImageInfo();
-            exportBtn.disabled = true;
-            exportPdfBtn.disabled = true;
 
-            previewBtn.disabled = true;
+            // 重置按钮状态到清空后状态
+            initializeButtonStatesAfterClear();
+
             mainFileInput.value = '';
             imageInput.value = '';
             pdfInput.value = '';
-            document.getElementById('reprocessBtn').style.display = 'none';
-            document.getElementById('paginationControls').style.display = 'none';
             updatePaginationButtons();
             updatePageInfo();
+
+            console.log('✅ 画布清空完成，主文件按钮状态:', mainFileButton.disabled);
             showStatus('画布已清空', 'info');
         }
 
@@ -2208,14 +3032,14 @@
 
         // 处理图片文件
         async function processImageFiles(files) {
-            const remainingSlots = MAX_IMAGES_PER_PAGE * MAX_PAGES - uploadedImages.length;
+            const remainingSlots = getMaxImagesPerPage() * MAX_PAGES - uploadedImages.length;
             if (remainingSlots <= 0) {
-                showStatus(`已达到最多${MAX_IMAGES_PER_PAGE * MAX_PAGES}个文件的限制。如需继续，请先清空画布。`, 'error');
+                showStatus(`已达到最多${getMaxImagesPerPage() * MAX_PAGES}个文件的限制。如需继续，请先清空画布。`, 'error');
                 return;
             }
 
             if (files.length > remainingSlots) {
-                showStatus(`本次最多还能添加 ${remainingSlots} 个文件（总计不超过${MAX_IMAGES_PER_PAGE * MAX_PAGES}个）`, 'info');
+                showStatus(`本次最多还能添加 ${remainingSlots} 个文件（总计不超过${getMaxImagesPerPage() * MAX_PAGES}个）`, 'info');
             }
 
             const filesToLoad = files.slice(0, Math.max(0, remainingSlots));
@@ -2232,21 +3056,21 @@
 
                         if (loadedCount === filesToLoad.length) {
                             // 更新总页数
-                            totalPages = Math.ceil(uploadedImages.length / MAX_IMAGES_PER_PAGE);
+                            totalPages = Math.ceil(uploadedImages.length / getMaxImagesPerPage());
 
-                            // 显示或隐藏分页控件
-                            const paginationControls = document.getElementById('paginationControls');
-                            if (totalPages > 1) {
-                                paginationControls.style.display = 'block';
-                                updatePaginationButtons();
-                                updatePageInfo();
-                            }
+                            // 自动跳转到新添加图片的最后一页
+                            currentPage = Math.max(0, totalPages - 1);
+
+                            // 更新分页控件
+                            updatePaginationButtons();
+                            updatePageInfo();
 
                             // 绘制当前页内容
                             drawCurrentPage();
                             updateImageInfo();
-                            exportBtn.disabled = uploadedImages.length === 0;
-                            exportPdfBtn.disabled = uploadedImages.length === 0;
+
+                            // 更新按钮状态
+                            updateButtonStatesWithFiles();
 
                             previewBtn.disabled = uploadedImages.length === 0;
                             showStatus(`成功添加 ${filesToLoad.length} 个文件（当前共 ${uploadedImages.length} 个，${totalPages} 页）`, 'success');
@@ -2264,14 +3088,92 @@
         updatePdfExportQualityInfo();
         updatePaginationButtons();
         updatePageInfo();
-        
+
+        // 初始化布局模式
+        currentLayoutMode = getCurrentLayoutMode();
+
+        // 添加画布点击事件监听器（用于删除按钮）
+        if (canvas) {
+            canvas.addEventListener('click', handleCanvasClick);
+        }
+
+        // 初始化按钮状态
+        initializeButtonStates();
+
         // 显示画布像素信息
         const devicePixelRatio = window.devicePixelRatio || 1;
         console.log('设备像素比:', devicePixelRatio);
         console.log('画布实际尺寸:', canvas.width, 'x', canvas.height);
         console.log('画布显示尺寸:', canvas.style.width, 'x', canvas.style.height);
-        
-        showStatus('请选择要上传的文件（图片或PDF，最多30个）');
+
+        // 粘贴板图片功能
+        document.addEventListener('paste', async function (e) {
+            e.preventDefault(); // 阻止默认粘贴行为
+
+            const items = e.clipboardData?.items;
+            if (!items) return;
+
+            for (let item of items) {
+                if (item.type.startsWith('image/')) {
+                    const file = item.getAsFile();
+                    if (!file) continue;
+
+                    try {
+                        // 检查文件数量限制
+                        const remainingSlots = getMaxImagesPerPage() * MAX_PAGES - uploadedImages.length;
+                        if (remainingSlots <= 0) {
+                            showStatus(`已达到最多${getMaxImagesPerPage() * MAX_PAGES}个文件的限制。如需继续，请先清空画布。`, 'error');
+                            return;
+                        }
+
+                        showStatus('正在处理粘贴的图片...', 'info');
+
+                        // 创建图片对象
+                        const img = new Image();
+                        img.onload = function () {
+                            uploadedImages.push(img);
+
+                            // 更新总页数
+                            totalPages = Math.ceil(uploadedImages.length / getMaxImagesPerPage());
+
+                            // 自动跳转到新图片所在的页面
+                            const newImageIndex = uploadedImages.length - 1;
+                            currentPage = Math.floor(newImageIndex / getMaxImagesPerPage());
+
+                            // 更新分页控件
+                            updatePaginationButtons();
+                            updatePageInfo();
+
+                            // 绘制当前页内容
+                            drawCurrentPage();
+                            updateImageInfo();
+
+                            // 更新按钮状态
+                            updateButtonStatesWithFiles();
+
+                            showStatus(`成功添加粘贴的图片（当前共 ${uploadedImages.length} 个，${totalPages} 页）`, 'success');
+                        };
+
+                        img.onerror = function () {
+                            showStatus('图片加载失败，请重试', 'error');
+                        };
+
+                        img.src = URL.createObjectURL(file);
+
+                    } catch (error) {
+                        console.error('粘贴图片处理失败:', error);
+                        showStatus('粘贴图片处理失败，请重试', 'error');
+                    }
+
+                    break; // 只处理第一个图片
+                }
+            }
+        });
+
+        // 显示粘贴提示
+        console.log('📋 粘贴板功能已启用：按 Ctrl+V 可直接粘贴图片到画布');
+
+        showStatus('请选择要上传的文件（图片或PDF，最多30个）或直接粘贴图片（Ctrl+V）');
     </script>
 </body>
 
