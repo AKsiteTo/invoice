@@ -650,7 +650,7 @@ body{
       <div class="form-group">
         <label>API 请求路径</label>
         <input type="text" id="apiBaseUrl" placeholder="https://newapi.lxhei.xyz/v1/chat/completions">
-        <div class="hint">所有模式都使用这个 chat/completions 请求地址</div>
+        <div class="hint">填写完整 API 请求地址，将按原样请求</div>
       </div>
       <div class="form-group">
         <label>NEW_API_KEY</label>
@@ -811,6 +811,8 @@ function getMessageImageIds(msg) {
 // ===== STATE =====
 const DEFAULT_API_URL = 'https://newapi.lxhei.xyz/v1/chat/completions';
 const DEFAULT_MODEL = 'gpt-image-2';
+const LARGE_IMAGE_THRESHOLD_BYTES = 5 * 1024 * 1024;
+const LARGE_IMAGE_COMPRESS_QUALITY = 0.8;
 
 const state = {
   chats: [],
@@ -1145,11 +1147,7 @@ async function cleanupOldChats() {
 function normalizeApiUrl(value) {
   const url = (value || '').trim().replace(/\/+$/, '');
   if (!url) return DEFAULT_API_URL;
-  if (/\/chat\/completions$/i.test(url)) return url;
-  if (/\/images\/(generations|edits)$/i.test(url)) {
-    return url.replace(/\/images\/(generations|edits)$/i, '/chat/completions');
-  }
-  return `${url}/chat/completions`;
+  return url;
 }
 
 // ===== SIDEBAR / CHAT LIST =====
@@ -1467,19 +1465,37 @@ function escapeHtml(str) {
 }
 
 // ===== API CALL =====
-async function buildContentString(text, imageIds) {
-  const chunks = [];
+async function getImageUrlForApi(imageId) {
+  const record = await getImageRecordFromDB(imageId);
+  if (!record?.dataUrl) return '';
+  return record.dataUrl;
+}
+
+async function buildUserMessageContent(text, imageIds) {
   const prompt = [state.settings.systemPrompt, text].filter(Boolean).join('\n\n').trim();
-  if (prompt) chunks.push(prompt);
+
+  if (!imageIds.length) {
+    return prompt || '请继续。';
+  }
+
+  const parts = [
+    {
+      type: 'text',
+      text: prompt || '请根据上传的图片进行处理。'
+    }
+  ];
 
   for (let i = 0; i < imageIds.length; i++) {
     const imageId = imageIds[i];
-    const record = await getImageRecordFromDB(imageId);
-    if (!record?.dataUrl) continue;
-    chunks.push(`[uploaded_image_${i + 1}:${record.name || imageId}]\n${record.dataUrl}\n[/uploaded_image_${i + 1}]`);
+    const imageUrl = await getImageUrlForApi(imageId);
+    if (!imageUrl) continue;
+    parts.push({
+      type: 'image_url',
+      image_url: { url: imageUrl }
+    });
   }
 
-  return chunks.join('\n\n') || '请根据上传的图片进行处理。';
+  return parts;
 }
 
 function normalizeReturnedContent(content) {
@@ -1620,7 +1636,7 @@ async function sendMessage() {
   await renderMessages(true);
 
   try {
-    const requestContent = await buildContentString(text, userMsg.images);
+    const requestContent = await buildUserMessageContent(text, userMsg.images);
     await requestChatCompletion(requestContent, assistantMsg);
 
     state.isGenerating = false;
@@ -1695,13 +1711,25 @@ async function addImage(file) {
   if (!file || !file.type.startsWith('image/')) return;
   const reader = new FileReader();
   reader.onload = async (e) => {
+    let dataUrl = e.target.result;
+    let storedName = file.name;
+    let storedMime = file.type;
+
+    if (file.size > LARGE_IMAGE_THRESHOLD_BYTES) {
+      dataUrl = await new Promise(resolve => {
+        compressImage(e.target.result, 4096, 4096, LARGE_IMAGE_COMPRESS_QUALITY, resolve);
+      });
+      storedName = file.name.replace(/(\.[^.]+)?$/, '_compressed.jpg');
+      storedMime = 'image/jpeg';
+    }
+
     // Save image to IndexedDB and store ID
     const imageId = generateImageId();
-    await saveImageToDB(imageId, e.target.result, { name: file.name, mime: file.type });
+    await saveImageToDB(imageId, dataUrl, { name: storedName, mime: storedMime });
     state.pendingImages.push({
-      name: file.name,
+      name: storedName,
       id: imageId,
-      dataUrl: e.target.result // Keep in memory for preview and API
+      dataUrl
     });
     renderImagePreviews();
   };
@@ -1728,6 +1756,7 @@ function compressImage(dataUrl, maxWidth, maxHeight, quality, callback) {
 
     callback(canvas.toDataURL('image/jpeg', quality));
   };
+  img.onerror = () => callback(dataUrl);
   img.src = dataUrl;
 }
 
