@@ -1,0 +1,1837 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Idea Chat</title>
+<style>
+:root {
+  --bg: #ffffff;
+  --bg-secondary: #f7f7f8;
+  --bg-hover: #ececf1;
+  --text: #1a1a2e;
+  --text-secondary: #6b7280;
+  --border: #e5e7eb;
+  --accent: #10a37f;
+  --accent-hover: #0e8c6b;
+  --accent-light: #e8f5f0;
+  --user-bubble: #ffffff;
+  --assistant-bubble: #f7f7f8;
+  --shadow: 0 0 15px rgba(0,0,0,.05);
+  --sidebar-bg: #f9fafb;
+  --input-bg: #ffffff;
+  --danger: #ef4444;
+  --danger-hover: #dc2626;
+  --code-bg: #1e1e2e;
+  --code-text: #cdd6f4;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-xs: 6px;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+[data-theme="dark"] {
+  --bg: #1a1a2e;
+  --bg-secondary: #16213e;
+  --bg-hover: #0f3460;
+  --text: #e4e4e7;
+  --text-secondary: #a1a1aa;
+  --border: #2d2d3d;
+  --accent: #10a37f;
+  --accent-hover: #0e8c6b;
+  --accent-light: #0f3460;
+  --user-bubble: #2d2d3d;
+  --assistant-bubble: #1a1a2e;
+  --sidebar-bg: #16213e;
+  --input-bg: #2d2d3d;
+  --code-bg: #11111b;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:var(--font);
+  background:var(--bg);
+  color:var(--text);
+  height:100vh;
+  display:flex;
+  overflow:hidden;
+  transition:background .3s,color .3s;
+}
+
+/* ===== SIDEBAR ===== */
+.sidebar{
+  width:280px;
+  min-width:280px;
+  background:var(--sidebar-bg);
+  border-right:1px solid var(--border);
+  display:flex;
+  flex-direction:column;
+  transition:all .3s;
+  z-index:10;
+}
+.sidebar.collapsed{
+  width:0;min-width:0;overflow:hidden;border-right:none;
+}
+.sidebar-header{
+  padding:12px 16px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  border-bottom:1px solid var(--border);
+}
+.sidebar-header h2{
+  font-size:16px;
+  font-weight:600;
+  flex:1;
+  white-space:nowrap;
+}
+.btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  border:none;
+  cursor:pointer;
+  font-size:14px;
+  font-family:var(--font);
+  transition:all .2s;
+  border-radius:var(--radius-xs);
+  white-space:nowrap;
+}
+.btn-icon{
+  width:36px;height:36px;
+  background:transparent;
+  color:var(--text-secondary);
+  border-radius:var(--radius-xs);
+  font-size:18px;
+}
+.btn-icon:hover{background:var(--bg-hover);color:var(--text)}
+.btn-primary{
+  background:var(--accent);
+  color:#fff;
+  padding:8px 16px;
+  border-radius:var(--radius-sm);
+  font-weight:500;
+}
+.btn-primary:hover{background:var(--accent-hover)}
+.btn-outline{
+  background:transparent;
+  color:var(--text);
+  border:1px solid var(--border);
+  padding:8px 16px;
+  border-radius:var(--radius-sm);
+}
+.btn-outline:hover{background:var(--bg-hover)}
+.btn-danger{
+  background:transparent;
+  color:var(--danger);
+  border:1px solid var(--danger);
+  padding:8px 16px;
+  border-radius:var(--radius-sm);
+}
+.btn-danger:hover{background:var(--danger);color:#fff}
+
+.new-chat-btn{
+  margin:12px 16px;
+  padding:10px 16px;
+  border-radius:var(--radius-sm);
+  border:1px solid var(--border);
+  background:var(--bg);
+  color:var(--text);
+  cursor:pointer;
+  font-size:14px;
+  font-family:var(--font);
+  text-align:left;
+  transition:all .2s;
+}
+.new-chat-btn:hover{background:var(--bg-hover)}
+.chat-list{
+  flex:1;
+  overflow-y:auto;
+  padding:4px 8px;
+}
+.chat-item{
+  padding:10px 12px;
+  border-radius:var(--radius-xs);
+  cursor:pointer;
+  font-size:13px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  transition:all .15s;
+  margin-bottom:2px;
+}
+.chat-item:hover{background:var(--bg-hover)}
+.chat-item.active{background:var(--accent-light)}
+.chat-item .title{
+  flex:1;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.chat-item .del-btn{
+  opacity:0;
+  width:24px;height:24px;
+  border:none;
+  background:transparent;
+  cursor:pointer;
+  color:var(--text-secondary);
+  border-radius:4px;
+  font-size:14px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  transition:all .15s;
+}
+.chat-item:hover .del-btn{opacity:1}
+.chat-item .del-btn:hover{background:var(--danger);color:#fff}
+.sidebar-footer{
+  padding:12px 16px;
+  border-top:1px solid var(--border);
+  display:flex;
+  gap:6px;
+}
+
+/* ===== MAIN ===== */
+.main{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+}
+.topbar{
+  height:52px;
+  min-height:52px;
+  border-bottom:1px solid var(--border);
+  display:flex;
+  align-items:center;
+  padding:0 16px;
+  gap:12px;
+  background:var(--bg);
+}
+.topbar .toggle-sidebar{
+  width:36px;height:36px;
+  border:none;
+  background:transparent;
+  cursor:pointer;
+  font-size:20px;
+  color:var(--text-secondary);
+  border-radius:var(--radius-xs);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.topbar .toggle-sidebar:hover{background:var(--bg-hover)}
+.topbar .model-badge{
+  font-size:12px;
+  color:var(--text-secondary);
+  background:var(--bg-secondary);
+  padding:4px 10px;
+  border-radius:12px;
+}
+.topbar .title{font-size:15px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chat-area{
+  flex:1;
+  overflow-y:auto;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  padding:20px 16px;
+  scroll-behavior:smooth;
+}
+.messages-container{
+  width:100%;
+  max-width:768px;
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+.welcome{
+  text-align:center;
+  padding:60px 20px;
+  color:var(--text-secondary);
+}
+.welcome h1{font-size:28px;color:var(--text);margin-bottom:8px}
+.welcome p{font-size:15px;line-height:1.6}
+
+/* ===== MESSAGE BUBBLES ===== */
+.message{
+  display:flex;
+  gap:12px;
+  padding:16px 20px;
+  border-radius:var(--radius);
+  animation:fadeIn .3s ease;
+}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.message.user{
+  background:var(--user-bubble);
+  flex-direction:row-reverse;
+}
+.message.assistant{background:var(--assistant-bubble)}
+.message .avatar{
+  width:32px;height:32px;
+  border-radius:50%;
+  flex-shrink:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:16px;
+  font-weight:600;
+}
+.message.user .avatar{background:#dbeafe;color:#2563eb}
+.message.assistant .avatar{background:var(--accent-light);color:var(--accent)}
+.message .content{
+  flex:1;
+  min-width:0;
+  line-height:1.7;
+  font-size:14px;
+  word-break:break-word;
+}
+.message.user .content{
+  text-align:right;
+}
+.message .content p{margin-bottom:8px}
+.message .content p:last-child{margin-bottom:0}
+.message .content pre{
+  background:var(--code-bg);
+  color:var(--code-text);
+  border-radius:var(--radius-sm);
+  padding:16px;
+  overflow-x:auto;
+  margin:8px 0;
+  font-size:13px;
+  line-height:1.5;
+}
+.message .content code{
+  font-family:'JetBrains Mono','Fira Code','Cascadia Code',monospace;
+  font-size:13px;
+}
+.message .content :not(pre) > code{
+  background:var(--bg-secondary);
+  color:var(--accent);
+  padding:2px 6px;
+  border-radius:4px;
+}
+.message .content img{
+  max-width:100%;
+  border-radius:var(--radius-sm);
+  margin:8px 0;
+  cursor:zoom-in;
+  transition:transform .2s;
+}
+.message .content img:hover{transform:scale(1.02)}
+.message .content ul,.message .content ol{padding-left:20px;margin:8px 0}
+.message .content li{margin-bottom:4px}
+.message .content blockquote{
+  border-left:3px solid var(--accent);
+  padding-left:12px;
+  color:var(--text-secondary);
+  margin:8px 0;
+}
+.message .content table{
+  border-collapse:collapse;
+  width:100%;
+  margin:8px 0;
+}
+.message .content th,.message .content td{
+  border:1px solid var(--border);
+  padding:8px 12px;
+  text-align:left;
+  font-size:13px;
+}
+.message .content th{background:var(--bg-secondary)}
+
+/* ===== IMAGE PREVIEW IN INPUT ===== */
+.image-preview-area{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  padding:8px 0;
+}
+.image-preview-item{
+  position:relative;
+  width:64px;height:64px;
+  border-radius:var(--radius-xs);
+  overflow:hidden;
+  border:1px solid var(--border);
+}
+.image-preview-item img{
+  width:100%;height:100%;
+  object-fit:cover;
+}
+.image-preview-item .remove-img{
+  position:absolute;
+  top:2px;right:2px;
+  width:20px;height:20px;
+  border-radius:50%;
+  background:rgba(0,0,0,.6);
+  color:#fff;
+  border:none;
+  cursor:pointer;
+  font-size:12px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+/* ===== INPUT AREA ===== */
+.input-area{
+  padding:0 16px 20px;
+  display:flex;
+  justify-content:center;
+}
+.input-wrapper{
+  width:100%;
+  max-width:768px;
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  background:var(--input-bg);
+  box-shadow:var(--shadow);
+  transition:border-color .2s;
+}
+.input-wrapper:focus-within{border-color:var(--accent)}
+.input-toolbar{
+  padding:8px 12px 0;
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:4px;
+}
+.input-inner{
+  display:flex;
+  align-items:flex-end;
+  padding:8px 12px 12px;
+  gap:8px;
+}
+.input-inner textarea{
+  flex:1;
+  border:none;
+  background:transparent;
+  resize:none;
+  outline:none;
+  font-family:var(--font);
+  font-size:14px;
+  line-height:1.5;
+  color:var(--text);
+  min-height:24px;
+  max-height:200px;
+}
+.input-inner textarea::placeholder{color:var(--text-secondary)}
+.send-btn{
+  width:36px;height:36px;
+  border-radius:50%;
+  border:none;
+  background:var(--accent);
+  color:#fff;
+  cursor:pointer;
+  font-size:18px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-shrink:0;
+  transition:all .2s;
+}
+.send-btn:hover{background:var(--accent-hover)}
+.send-btn:disabled{background:var(--border);cursor:not-allowed}
+.send-btn svg{width:18px;height:18px}
+.stop-btn{
+  width:36px;height:36px;
+  border-radius:50%;
+  border:1px solid var(--border);
+  background:var(--bg);
+  cursor:pointer;
+  font-size:14px;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  flex-shrink:0;
+}
+.stop-btn.visible{display:flex}
+.input-hint{
+  text-align:center;
+  font-size:11px;
+  color:var(--text-secondary);
+  padding:4px 0 8px;
+}
+
+/* ===== SETTINGS MODAL ===== */
+.modal-overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.4);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:100;
+  animation:fadeIn .2s ease;
+}
+.modal{
+  background:var(--bg);
+  border-radius:var(--radius);
+  width:90%;
+  max-width:520px;
+  max-height:80vh;
+  overflow-y:auto;
+  box-shadow:0 20px 60px rgba(0,0,0,.2);
+}
+.modal-header{
+  padding:20px 24px 0;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+.modal-header h2{font-size:18px}
+.modal-body{padding:20px 24px 24px}
+.form-group{margin-bottom:16px}
+.form-group label{
+  display:block;
+  font-size:13px;
+  font-weight:500;
+  margin-bottom:6px;
+  color:var(--text-secondary);
+}
+.form-group input,.form-group select{
+  width:100%;
+  padding:10px 12px;
+  border:1px solid var(--border);
+  border-radius:var(--radius-xs);
+  font-size:14px;
+  font-family:var(--font);
+  background:var(--input-bg);
+  color:var(--text);
+  outline:none;
+  transition:border-color .2s;
+}
+.form-group input:focus,.form-group select:focus{border-color:var(--accent)}
+.form-group .hint{font-size:11px;color:var(--text-secondary);margin-top:4px}
+.modal-footer{
+  display:flex;
+  justify-content:flex-end;
+  gap:8px;
+  padding-top:8px;
+}
+
+/* ===== THEME TOGGLE ===== */
+.theme-toggle{
+  width:36px;height:36px;
+  border:none;
+  background:transparent;
+  cursor:pointer;
+  font-size:18px;
+  color:var(--text-secondary);
+  border-radius:var(--radius-xs);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.theme-toggle:hover{background:var(--bg-hover)}
+
+/* ===== SCROLLBAR ===== */
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--text-secondary)}
+
+/* ===== LOADING DOTS ===== */
+.typing-indicator{
+  display:flex;
+  gap:4px;
+  padding:4px 0;
+}
+.typing-indicator span{
+  width:8px;height:8px;
+  border-radius:50%;
+  background:var(--text-secondary);
+  animation:typing 1.4s infinite;
+}
+.typing-indicator span:nth-child(2){animation-delay:.2s}
+.typing-indicator span:nth-child(3){animation-delay:.4s}
+@keyframes typing{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-8px);opacity:1}}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width:640px){
+  .sidebar{display:none}
+  .sidebar.collapsed{display:none}
+  .message{padding:12px 12px}
+  .messages-container{max-width:100%}
+  .input-wrapper{max-width:100%}
+  .chat-area{padding:16px 12px}
+  .topbar{padding:0 12px}
+  .input-area{padding:0 12px 24px;padding-bottom:calc(16px + env(safe-area-inset-bottom))}
+  .welcome{padding:40px 16px}
+  .welcome h1{font-size:22px}
+  .message .avatar{width:28px;height:28px;font-size:14px}
+  .message .content{font-size:13px}
+  /* Ensure chat area takes full available height minus input area */
+  .main{height:100vh;height:calc(100vh - env(safe-area-inset-bottom))}
+  .chat-area{flex:1;overflow-y:auto}
+  /* Add padding at bottom to prevent input from covering last message */
+  .messages-container{padding-bottom:40px;padding-bottom:calc(20px + env(safe-area-inset-bottom))}
+}
+
+/* ===== IMAGE LIGHTBOX ===== */
+.lightbox{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.9);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:200;
+  cursor:zoom-out;
+  animation:fadeIn .2s ease;
+}
+.lightbox img{
+  max-width:90%;
+  max-height:90%;
+  object-fit:contain;
+  border-radius:var(--radius-sm);
+  box-shadow:0 20px 60px rgba(0,0,0,.5);
+}
+</style>
+</head>
+<body data-theme="light">
+
+<!-- ===== SIDEBAR ===== -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <h2>对话列表</h2>
+    <button class="btn-icon" onclick="toggleSidebar()" title="收起侧边栏">☰</button>
+  </div>
+  <button class="new-chat-btn" onclick="newChat()">＋ 新建对话</button>
+  <div class="chat-list" id="chatList"></div>
+  <div class="sidebar-footer">
+    <button class="btn-outline" style="flex:1" onclick="openSettings()">⚙ 设置</button>
+    <button class="theme-toggle" onclick="toggleTheme()" title="切换主题" id="themeBtn">🌙</button>
+  </div>
+</aside>
+
+<!-- ===== MAIN ===== -->
+<main class="main">
+  <div class="topbar">
+    <button class="toggle-sidebar" onclick="toggleSidebar()" title="展开侧边栏">☰</button>
+    <span class="title" id="chatTitle">新对话</span>
+    <span class="model-badge" id="modelBadge">gpt-image-2</span>
+    <button class="btn-icon" onclick="openSettings()" title="设置">⚙</button>
+    <button class="theme-toggle" onclick="toggleTheme()" title="切换主题" id="themeBtn2">🌙</button>
+  </div>
+  <div class="chat-area" id="chatArea">
+    <div class="welcome">
+      <h1>Idea Chat</h1>
+      <p>支持文本与图片一起发送<br>开始一段新的对话吧</p>
+    </div>
+    <div class="messages-container" id="messagesContainer"></div>
+  </div>
+  <div class="input-area">
+    <div class="input-wrapper" id="inputWrapper">
+      <div class="image-preview-area" id="imagePreviewArea"></div>
+      <div class="input-toolbar">
+        <button class="btn-icon" onclick="document.getElementById('imageInput').click()" title="上传图片">🖼</button>
+        <input type="file" id="imageInput" accept="image/*" multiple hidden onchange="handleImageUpload(event)">
+      </div>
+      <div class="input-inner">
+        <textarea id="messageInput" rows="1" placeholder="输入消息..." onkeydown="handleKeyDown(event)" oninput="autoResize()"></textarea>
+        <button class="send-btn" id="sendBtn" onclick="sendMessage()" title="发送">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+        </button>
+        <button class="stop-btn" id="stopBtn" onclick="stopGeneration()" title="停止">■</button>
+      </div>
+      <div class="input-hint">Enter 发送 · Shift+Enter 换行 · 支持粘贴图片</div>
+    </div>
+  </div>
+</main>
+
+<!-- ===== SETTINGS MODAL ===== -->
+<div class="modal-overlay" id="settingsModal" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>API 设置</h2>
+      <button class="btn-icon" onclick="closeSettings()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>API 请求路径</label>
+        <input type="text" id="apiBaseUrl" placeholder="https://newapi.lxhei.xyz/v1/chat/completions">
+        <div class="hint">所有模式都使用这个 chat/completions 请求地址</div>
+      </div>
+      <div class="form-group">
+        <label>NEW_API_KEY</label>
+        <input type="password" id="apiKey" placeholder="输入你的 API Key">
+        <div class="hint">对应接口中的 NEW_API_KEY，仅保存在浏览器本地</div>
+      </div>
+      <div class="form-group">
+        <label>模型名称</label>
+        <input type="text" id="modelName" value="gpt-image-2" readonly>
+        <div class="hint">三种模式统一使用 gpt-image-2</div>
+      </div>
+      <div class="form-group">
+        <label>Temperature</label>
+        <input type="number" id="temperature" placeholder="0.7" min="0" max="2" step="0.1">
+        <div class="hint">控制输出随机性，0-2 之间，默认 0.7</div>
+      </div>
+      <div class="form-group">
+        <label>上下文条数</label>
+        <input type="number" id="contextLength" placeholder="3" min="1" max="10" step="1">
+        <div class="hint">每次请求携带的历史消息条数，默认 3，取值范围 1-10</div>
+      </div>
+      <div class="form-group">
+        <label>系统提示词（可选）</label>
+        <input type="text" id="systemPrompt" placeholder="你是一个有帮助的助手">
+      </div>
+    </div>
+    <div class="modal-footer" style="padding:0 24px 24px">
+      <button class="btn-outline" onclick="closeSettings()">取消</button>
+      <button class="btn-primary" onclick="saveSettings()">保存设置</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== FIRST-TIME PROMPT MODAL ===== -->
+<div class="modal-overlay" id="firstTimeModal" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>欢迎使用 Idea Chat</h2>
+    </div>
+    <div class="modal-body">
+      <p style="margin-bottom:16px;color:var(--text-secondary)">请填写 NEW_API_KEY 以开始使用</p>
+      <div class="form-group">
+        <label>NEW_API_KEY</label>
+        <input type="password" id="firstTimeApiKey" placeholder="输入你的 API Key">
+        <div class="hint">对应接口中的 NEW_API_KEY，仅保存在浏览器本地</div>
+      </div>
+    </div>
+    <div class="modal-footer" style="padding:0 24px 24px">
+      <button class="btn-primary" onclick="saveFirstTimeApiKey()">开始使用</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== INDEXEDDB FOR IMAGES =====
+const DB_NAME = 'AIChatDB';
+const DB_VERSION = 1;
+const STORE_NAME = 'images';
+let db = null;
+
+function initDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      db = request.result;
+      resolve(db);
+    };
+
+    request.onupgradeneeded = (event) => {
+      const database = event.target.result;
+      if (!database.objectStoreNames.contains(STORE_NAME)) {
+        database.createObjectStore(STORE_NAME, { keyPath: 'id' });
+      }
+    };
+  });
+}
+
+function saveImageToDB(id, dataUrl, meta = {}) {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([STORE_NAME], 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.put({
+      id,
+      dataUrl,
+      name: meta.name || '',
+      mime: meta.mime || getDataUrlMime(dataUrl),
+      timestamp: Date.now()
+    });
+    request.onsuccess = () => resolve(id);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function getImageRecordFromDB(id) {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([STORE_NAME], 'readonly');
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.get(id);
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function getImageFromDB(id) {
+  return getImageRecordFromDB(id).then(record => record?.dataUrl || null);
+}
+
+function deleteImageFromDB(id) {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([STORE_NAME], 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.delete(id);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function generateImageId() {
+  return 'img_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
+function generateContentImageId(messageId, index) {
+  return `ci_${messageId}_${Date.now()}_${index}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function isDataUrl(value) {
+  return typeof value === 'string' && /^data:image\/[^;]+;base64,/i.test(value);
+}
+
+function isStoredImageId(value) {
+  return typeof value === 'string' && /^(img|ci)_/.test(value);
+}
+
+function getDataUrlMime(dataUrl) {
+  return /^data:([^;]+);/i.exec(dataUrl || '')?.[1] || '';
+}
+
+function getContentImageIds(content) {
+  if (!content) return [];
+  const ids = [];
+  const markerRegex = /!\[[^\]]*\]\(IDX:([^)]+)\)/g;
+  let match;
+  while ((match = markerRegex.exec(content)) !== null) {
+    ids.push(match[1]);
+  }
+  return ids;
+}
+
+function getMessageImageIds(msg) {
+  return [
+    ...(Array.isArray(msg.images) ? msg.images.filter(isStoredImageId) : []),
+    ...getContentImageIds(msg.content)
+  ];
+}
+
+// ===== STATE =====
+const DEFAULT_API_URL = 'https://newapi.lxhei.xyz/v1/chat/completions';
+const DEFAULT_MODEL = 'gpt-image-2';
+
+const state = {
+  chats: [],
+  currentChatId: null,
+  settings: {
+    apiBaseUrl: DEFAULT_API_URL,
+    apiKey: '',
+    model: DEFAULT_MODEL,
+    systemPrompt: '',
+    temperature: 0.7,
+    contextLength: 3
+  },
+  isGenerating: false,
+  abortController: null,
+  theme: 'light',
+  pendingImages: [],
+  waitingMessageIndex: 0,
+  waitingTimer: null,
+  generationStartTime: null,
+  imageCache: {} // Cache for loaded images
+};
+
+// ===== WAITING MESSAGES =====
+const WAITING_PHASES = {
+  phase1: [
+    '📡 信号已发出，正在呼叫大模型…',
+    '🧠 大模型从休眠中唤醒…',
+    '☕ 给它几秒钟，冲杯咖啡先'
+  ],
+  phase2: [
+    '🤔 它托着腮帮子想啊想…',
+    '⚡ 神经元正在疯狂放电',
+    '📚 翻遍了今天的知识库',
+    '💡 灵感好像快来了…',
+    '🎲 扔了个骰子，决定认真回答',
+    '🌀 思维风暴正在生成中',
+    '🦾 检查一遍，别闹笑话',
+    '🎬 它清了清嗓子，准备打字了'
+  ],
+  phase3: [
+    '✍️ 答案已经写好了，就差发送…',
+    '📨 正在打包回复，注意查收',
+    '✨ 来吧，答案即将揭晓！'
+  ]
+};
+
+function getWaitingMessage() {
+  const elapsed = Date.now() - (state.generationStartTime || Date.now());
+  const seconds = elapsed / 1000;
+
+  let messages;
+  if (seconds < 20) {
+    // Phase 1: 0-20秒
+    messages = WAITING_PHASES.phase1;
+  } else if (seconds < 80) {
+    // Phase 2: 20-80秒
+    messages = WAITING_PHASES.phase2;
+  } else {
+    // Phase 3: 80秒之后
+    messages = WAITING_PHASES.phase3;
+  }
+
+  const index = state.waitingMessageIndex % messages.length;
+  return messages[index];
+}
+
+function startWaitingTimer() {
+  state.generationStartTime = Date.now();
+  state.waitingMessageIndex = 0;
+  state.waitingTimer = setInterval(() => {
+    state.waitingMessageIndex++;
+    updateWaitingMessage();
+  }, 2000);
+}
+
+function updateWaitingMessage() {
+  const waitingEl = document.getElementById('waitingMessage');
+  if (waitingEl) {
+    waitingEl.innerHTML = getWaitingMessage();
+  }
+}
+
+function stopWaitingTimer() {
+  if (state.waitingTimer) {
+    clearInterval(state.waitingTimer);
+    state.waitingTimer = null;
+  }
+  state.generationStartTime = null;
+  state.waitingMessageIndex = 0;
+}
+
+// ===== INDEXEDDB FOR IMAGES =====
+const IMAGE_DB_NAME = 'ai_chat_images';
+const IMAGE_DB_VERSION = 1;
+let imageDBPromise = null;
+
+function getImageDB() {
+  if (imageDBPromise) return imageDBPromise;
+  imageDBPromise = new Promise((resolve, reject) => {
+    const request = indexedDB.open(IMAGE_DB_NAME, IMAGE_DB_VERSION);
+    request.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('images')) {
+        db.createObjectStore('images', { keyPath: 'messageId' });
+      }
+    };
+    request.onsuccess = (e) => resolve(e.target.result);
+    request.onerror = (e) => reject(e.target.error);
+  });
+  return imageDBPromise;
+}
+
+async function saveImagesToDB(messageId, images) {
+  if (!images || images.length === 0) return;
+  try {
+    const db = await getImageDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('images', 'readwrite');
+      const store = tx.objectStore('images');
+      store.put({ messageId, images });
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch(e) { console.error('IndexedDB 保存图片失败:', e); }
+}
+
+async function loadImagesFromDB(messageId) {
+  try {
+    const db = await getImageDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('images', 'readonly');
+      const store = tx.objectStore('images');
+      const request = store.get(messageId);
+      request.onsuccess = () => resolve(request.result ? request.result.images : null);
+      request.onerror = () => reject(request.error);
+    });
+  } catch(e) { console.error('IndexedDB 读取图片失败:', e); return null; }
+}
+
+async function deleteImagesFromDB(messageId) {
+  try {
+    const db = await getImageDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('images', 'readwrite');
+      const store = tx.objectStore('images');
+      store.delete(messageId);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch(e) { console.error('IndexedDB 删除图片失败:', e); }
+}
+
+async function deleteChatImagesFromDB(chat) {
+  if (!chat || !chat.messages) return;
+  for (const msg of chat.messages) {
+    if (msg.id) await deleteImagesFromDB(msg.id);
+  }
+}
+
+async function migrateImageRefsToIds(items, ownerId) {
+  const ids = [];
+  if (!Array.isArray(items)) return ids;
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (!item) continue;
+
+    if (isStoredImageId(item)) {
+      ids.push(item);
+      continue;
+    }
+
+    if (isDataUrl(item)) {
+      const id = `img_${ownerId}_${i}_${Math.random().toString(36).slice(2, 7)}`;
+      await saveImageToDB(id, item);
+      ids.push(id);
+      continue;
+    }
+
+    if (/^https?:\/\//i.test(item)) {
+      const dataUrl = await imageUrlToBase64(item);
+      const id = `img_${ownerId}_${i}_${Math.random().toString(36).slice(2, 7)}`;
+      await saveImageToDB(id, dataUrl || item);
+      ids.push(id);
+    }
+  }
+
+  return ids;
+}
+
+async function normalizeStoredMessageImages(msg) {
+  let changed = false;
+  if (!msg.id) {
+    msg.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    changed = true;
+  }
+
+  const oldHasImages = !!msg.hasImages;
+  const sourceImages = Array.isArray(msg.images) ? msg.images : [];
+  const legacyImages = Array.isArray(msg.compressedImages) ? msg.compressedImages : [];
+  let imageIds = await migrateImageRefsToIds(sourceImages.length ? sourceImages : legacyImages, msg.id);
+
+  if (imageIds.length === 0 && msg.hasImages) {
+    const oldMessageImages = await loadImagesFromDB(msg.id);
+    imageIds = await migrateImageRefsToIds(oldMessageImages || [], msg.id);
+  }
+
+  if (sourceImages.join('|') !== imageIds.join('|') || legacyImages.length > 0 || msg.compressedImages) {
+    changed = true;
+  }
+
+  msg.images = imageIds;
+  msg.hasImages = imageIds.length > 0;
+  if (oldHasImages !== msg.hasImages) changed = true;
+  if (msg.compressedImages) {
+    delete msg.compressedImages;
+    changed = true;
+  }
+
+  if (msg.role === 'assistant' && msg.content && msg.content.includes('IDX:')) {
+    msg._rendered = await resolveContentImages(msg.content);
+  }
+
+  return changed;
+}
+
+// ===== INIT =====
+async function init() {
+  await initDB();
+  await loadFromStorage();
+  renderChatList();
+  if (state.chats.length > 0) {
+    switchChat(state.chats[0].id);
+  }
+  applyTheme();
+  document.addEventListener('paste', handlePaste);
+
+  // Check if first-time user (no API key)
+  if (!state.settings.apiKey) {
+    showFirstTimePrompt();
+  }
+}
+
+async function loadFromStorage() {
+  try {
+    const saved = localStorage.getItem('ai_chat_data');
+    if (saved) {
+      const data = JSON.parse(saved);
+      state.chats = data.chats || [];
+      state.settings = {...state.settings, ...data.settings};
+      state.settings.apiBaseUrl = normalizeApiUrl(state.settings.apiBaseUrl);
+      state.settings.model = DEFAULT_MODEL;
+      state.theme = data.theme || 'light';
+
+      // localStorage keeps only image IDs; bytes live in IndexedDB.
+      let needsSave = false;
+      for (const chat of state.chats) {
+        for (const msg of chat.messages) {
+          if (await normalizeStoredMessageImages(msg)) needsSave = true;
+        }
+      }
+      if (needsSave) {
+        saveToStorage();
+      }
+    }
+  } catch(e) { console.error('加载数据失败:', e); }
+}
+
+function saveToStorage() {
+  try {
+    // Keep image IDs in localStorage (they're small), actual data in IndexedDB
+    const chatsForStorage = state.chats.map(chat => ({
+      ...chat,
+      messages: chat.messages.map(msg => {
+        const { compressedImages, _rendered, _imageData, ...rest } = msg;
+        return rest; // Keep images array (IDs only), strip heavy data
+      })
+    }));
+
+    const data = {
+      chats: chatsForStorage,
+      settings: state.settings,
+      theme: state.theme
+    };
+
+    try {
+      localStorage.setItem('ai_chat_data', JSON.stringify(data));
+    } catch (e) {
+      if (e.name === 'QuotaExceededError' || e.code === 22) {
+        console.warn('存储空间不足，正在清理旧对话...');
+        cleanupOldChats();
+        const cleanedData = {
+          chats: state.chats.map(chat => ({
+            ...chat,
+            messages: chat.messages.map(msg => {
+              const { compressedImages, _rendered, _imageData, ...rest } = msg;
+              return rest;
+            })
+          })),
+          settings: state.settings,
+          theme: state.theme
+        };
+        try {
+          localStorage.setItem('ai_chat_data', JSON.stringify(cleanedData));
+        } catch (e2) {
+          console.error('清理后仍无法保存:', e2);
+          alert('存储空间不足，部分旧对话已被清理。建议导出重要对话后清理更多。');
+        }
+      } else {
+        throw e;
+      }
+    }
+  } catch(e) { console.error('保存数据失败:', e); }
+}
+
+async function cleanupOldChats() {
+  // Keep only the 5 most recent chats
+  if (state.chats.length > 5) {
+    const oldChats = state.chats.slice(5);
+    // Clean up IndexedDB images for removed chats
+    for (const chat of oldChats) {
+      for (const msg of chat.messages) {
+        for (const imageId of getMessageImageIds(msg)) {
+          await deleteImageFromDB(imageId);
+        }
+      }
+    }
+    state.chats = state.chats.slice(0, 5);
+  }
+}
+
+function normalizeApiUrl(value) {
+  const url = (value || '').trim().replace(/\/+$/, '');
+  if (!url) return DEFAULT_API_URL;
+  if (/\/chat\/completions$/i.test(url)) return url;
+  if (/\/images\/(generations|edits)$/i.test(url)) {
+    return url.replace(/\/images\/(generations|edits)$/i, '/chat/completions');
+  }
+  return `${url}/chat/completions`;
+}
+
+// ===== SIDEBAR / CHAT LIST =====
+function renderChatList() {
+  const list = document.getElementById('chatList');
+  if (state.chats.length === 0) {
+    list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-secondary);font-size:13px">暂无对话</div>';
+    return;
+  }
+  list.innerHTML = state.chats.map(chat => `
+    <div class="chat-item${chat.id === state.currentChatId ? ' active' : ''}" onclick="switchChat('${chat.id}')">
+      <span class="title">${escapeHtml(chat.title || '新对话')}</span>
+      <button class="del-btn" onclick="event.stopPropagation();deleteChat('${chat.id}')" title="删除">×</button>
+    </div>
+  `).join('');
+}
+
+async function newChat() {
+  const chat = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+    title: '新对话',
+    messages: []
+  };
+  state.chats.unshift(chat);
+  state.currentChatId = chat.id;
+  state.pendingImages = [];
+  saveToStorage();
+  renderChatList();
+  await renderMessages();
+  clearImagePreviews();
+  updateUI();
+}
+
+async function switchChat(id) {
+  state.currentChatId = id;
+  state.pendingImages = [];
+  state.isGenerating = false;
+  if (state.abortController) {
+    state.abortController.abort();
+    state.abortController = null;
+  }
+  saveToStorage();
+  renderChatList();
+  await renderMessages();
+  clearImagePreviews();
+  updateUI();
+  scrollToBottom();
+}
+
+async function deleteChat(id) {
+  if (!confirm('确定删除此对话？')) return;
+  const chat = state.chats.find(c => c.id === id);
+  if (chat) {
+    // Delete images from IndexedDB
+    for (const msg of chat.messages) {
+      for (const imageId of getMessageImageIds(msg)) {
+        await deleteImageFromDB(imageId);
+      }
+    }
+  }
+  state.chats = state.chats.filter(c => c.id !== id);
+  if (state.currentChatId === id) {
+    state.currentChatId = state.chats.length > 0 ? state.chats[0].id : null;
+    state.pendingImages = [];
+  }
+  saveToStorage();
+  renderChatList();
+  await renderMessages();
+  updateUI();
+}
+
+function getCurrentChat() {
+  return state.chats.find(c => c.id === state.currentChatId) || null;
+}
+
+// ===== MESSAGES RENDERING =====
+async function renderMessages(isNewStream = false) {
+  const container = document.getElementById('messagesContainer');
+  const welcome = document.getElementById('chatArea').querySelector('.welcome');
+  const chat = getCurrentChat();
+
+  if (!chat || chat.messages.length === 0) {
+    container.innerHTML = '';
+    if (welcome) welcome.style.display = '';
+    return;
+  }
+  if (welcome) welcome.style.display = 'none';
+
+  const total = chat.messages.length;
+  const isStreaming = state.isGenerating;
+  const lastMsg = chat.messages[total - 1];
+  const lastIsEmptyAssistant = isStreaming && lastMsg && lastMsg.role === 'assistant' && (!lastMsg.content || lastMsg.content.trim() === '');
+
+  // Skip the empty assistant placeholder when streaming (waiting message will show instead)
+  const messagesToRender = lastIsEmptyAssistant ? chat.messages.slice(0, -1) : chat.messages;
+
+  // Load images from IndexedDB for user messages
+  const messagesHtml = await Promise.all(messagesToRender.map(async (msg) => {
+    const isUser = msg.role === 'user';
+    const avatar = isUser ? '👤' : '🤖';
+    let contentHtml = '';
+
+    if (isUser) {
+      let imgs = '';
+      if (msg.images && msg.images.length > 0) {
+        const imageUrls = await Promise.all(msg.images.map(async (imageId) => {
+          const dataUrl = await getImageFromDB(imageId);
+          return dataUrl || '';
+        }));
+        imgs = '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px;justify-content:flex-end">' +
+          imageUrls.map(url => url ? `<img src="${url}" style="max-width:200px;max-height:200px;border-radius:6px;cursor:zoom-in" onclick="showLightbox('${url}')">` : '').join('') +
+          '</div>';
+      }
+      contentHtml = imgs + renderMarkdown(msg.content || '');
+    } else {
+      // Use resolved content (with real base64) for display, fall back to raw content
+      if (!msg._rendered && msg.content && msg.content.includes('IDX:')) {
+        msg._rendered = await resolveContentImages(msg.content);
+      }
+      const displayContent = msg._rendered || msg.content || '';
+      contentHtml = renderMarkdown(displayContent);
+    }
+
+    return `
+      <div class="message ${msg.role}">
+        <div class="avatar">${avatar}</div>
+        <div class="content">${contentHtml}</div>
+      </div>
+    `;
+  }));
+
+  container.innerHTML = messagesHtml.join('');
+
+  // Show waiting indicator when streaming starts with empty assistant
+  if (lastIsEmptyAssistant) {
+    container.innerHTML += `
+      <div class="message assistant">
+        <div class="avatar">🤖</div>
+        <div id="waitingMessage" class="content" style="color:var(--text-secondary);font-style:italic">${getWaitingMessage()}</div>
+      </div>
+    `;
+  }
+
+  scrollToBottom();
+}
+
+function updateStreamingContent(content) {
+  // Remove waiting message if exists
+  const waitingEl = document.getElementById('waitingMessage');
+  if (waitingEl) {
+    const msgDiv = waitingEl.closest('.message');
+    if (msgDiv) msgDiv.remove();
+  }
+
+  // Update or create streaming content
+  let streamEl = document.getElementById('streamingContent');
+  if (!streamEl) {
+    const container = document.getElementById('messagesContainer');
+    container.innerHTML += `
+      <div class="message assistant">
+        <div class="avatar">🤖</div>
+        <div id="streamingContent" class="content">${renderMarkdown(content)}</div>
+      </div>
+    `;
+  } else {
+    streamEl.innerHTML = renderMarkdown(content);
+  }
+}
+
+function scrollToBottom() {
+  requestAnimationFrame(() => {
+    const area = document.getElementById('chatArea');
+    area.scrollTop = area.scrollHeight;
+  });
+}
+
+// ===== IMAGE LIGHTBOX =====
+function showLightbox(src) {
+  const lightbox = document.createElement('div');
+  lightbox.className = 'lightbox';
+  lightbox.onclick = () => lightbox.remove();
+  lightbox.innerHTML = `<img src="${src}" alt="放大图片">`;
+  document.body.appendChild(lightbox);
+}
+
+// ===== CONVERT IMAGE URL TO INDEXEDDB (NO localStorage BLOAT) =====
+async function imageUrlToBase64(url) {
+  try {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch (e) {
+    console.error('图片转换失败:', e);
+    return null;
+  }
+}
+
+// Convert markdown images in content: store bytes in IndexedDB, keep only IDX markers in localStorage.
+async function convertImagesInContent(content, messageId) {
+  if (!content || !messageId) return content;
+  const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+  const matches = [];
+  let match;
+
+  while ((match = imgRegex.exec(content)) !== null) {
+    if (!match[2].startsWith('IDX:')) {
+      matches.push({ full: match[0], alt: match[1], url: match[2] });
+    }
+  }
+
+  if (matches.length === 0) return content;
+
+  let newContent = content;
+  for (let i = 0; i < matches.length; i++) {
+    const { full, alt, url } = matches[i];
+    const imageData = isDataUrl(url) ? url : await imageUrlToBase64(url);
+    const storedImage = imageData || (/^https?:\/\//i.test(url) ? url : '');
+    if (storedImage) {
+      const imgKey = generateContentImageId(messageId, i);
+      await saveImageToDB(imgKey, storedImage);
+      newContent = newContent.replace(full, `![${alt || '图片'}](IDX:${imgKey})`);
+    }
+  }
+
+  return newContent;
+}
+
+async function convertRawDataUrlsInContent(content, messageId) {
+  if (!content || !messageId) return content;
+  const dataUrlRegex = /data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]+/g;
+  const matches = [...content.matchAll(dataUrlRegex)].map(match => match[0]);
+  if (matches.length === 0) return content;
+
+  let newContent = content;
+  for (let i = 0; i < matches.length; i++) {
+    const dataUrl = matches[i];
+    const imgKey = generateContentImageId(messageId, `raw_${i}`);
+    await saveImageToDB(imgKey, dataUrl);
+    newContent = newContent.replace(dataUrl, `![图片](IDX:${imgKey})`);
+  }
+  return newContent;
+}
+
+// Resolve IDX: markers in content to actual base64 from IndexedDB (for rendering)
+async function resolveContentImages(content) {
+  if (!content) return content;
+  const markerRegex = /!\[([^\]]*)\]\(IDX:([^)]+)\)/g;
+  const markers = [];
+  let match;
+
+  while ((match = markerRegex.exec(content)) !== null) {
+    markers.push({ full: match[0], alt: match[1], key: match[2] });
+  }
+
+  if (markers.length === 0) return content;
+
+  let newContent = content;
+  for (const { full, alt, key } of markers) {
+    const imageData = await getImageFromDB(key);
+    if (imageData) {
+      newContent = newContent.replace(full, `![${alt}](${imageData})`);
+    }
+  }
+
+  return newContent;
+}
+
+// ===== SIMPLE MARKDOWN RENDERER =====
+function renderMarkdown(text) {
+  if (!text) return '';
+  let html = escapeHtml(text);
+
+  html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (match, lang, code) => {
+    return `<pre><code class="language-${lang}">${escapeHtml(code.trim())}</code></pre>`;
+  });
+
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" loading="lazy" style="cursor:zoom-in" onclick="showLightbox(\'$2\')">');
+
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+
+  html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
+  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+  html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+
+  html = html.replace(/^[\-\*] (.+)$/gm, '<li>$1</li>');
+  html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+
+  html = html.replace(/^---$/gm, '<hr>');
+
+  html = html.replace(/\n\n/g, '</p><p>');
+  html = html.replace(/\n/g, '<br>');
+
+  if (!html.startsWith('<')) html = '<p>' + html + '</p>';
+
+  return html;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// ===== API CALL =====
+async function buildContentString(text, imageIds) {
+  const chunks = [];
+  const prompt = [state.settings.systemPrompt, text].filter(Boolean).join('\n\n').trim();
+  if (prompt) chunks.push(prompt);
+
+  for (let i = 0; i < imageIds.length; i++) {
+    const imageId = imageIds[i];
+    const record = await getImageRecordFromDB(imageId);
+    if (!record?.dataUrl) continue;
+    chunks.push(`[uploaded_image_${i + 1}:${record.name || imageId}]\n${record.dataUrl}\n[/uploaded_image_${i + 1}]`);
+  }
+
+  return chunks.join('\n\n') || '请根据上传的图片进行处理。';
+}
+
+function normalizeReturnedContent(content) {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+
+  return content.map(part => {
+    if (typeof part === 'string') return part;
+    if (part?.text) return part.text;
+    if (part?.image_url?.url) return `![生成图片](${part.image_url.url})`;
+    if (part?.url) return `![生成图片](${part.url})`;
+    if (part?.b64_json) return `![生成图片](data:image/png;base64,${part.b64_json})`;
+    return '';
+  }).filter(Boolean).join('\n\n');
+}
+
+function extractImageItems(data) {
+  if (Array.isArray(data?.data)) return data.data;
+  if (Array.isArray(data?.images)) return data.images;
+  if (data?.url || data?.b64_json) return [data];
+  return [];
+}
+
+async function imageResponseToMarkdown(data, messageId, fallbackContent = '') {
+  const items = extractImageItems(data);
+  const chunks = [];
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    const key = generateContentImageId(messageId, i);
+    if (item.b64_json) {
+      await saveImageToDB(key, `data:image/png;base64,${item.b64_json}`);
+      chunks.push(`![生成图片](IDX:${key})`);
+    } else if (item.url) {
+      const base64 = await imageUrlToBase64(item.url);
+      const storedImage = base64 || item.url;
+      if (storedImage) {
+        await saveImageToDB(key, storedImage);
+        chunks.push(`![生成图片](IDX:${key})`);
+      }
+    }
+  }
+
+  const chatContent = fallbackContent || normalizeReturnedContent(data?.choices?.[0]?.message?.content) || data?.output_text || '';
+  if (chatContent) chunks.push(chatContent);
+  if (data?.revised_prompt) chunks.push(`\n\n${data.revised_prompt}`);
+
+  return chunks.join('\n\n').trim();
+}
+
+async function requestChatCompletion(content, assistantMsg) {
+  const response = await fetch(normalizeApiUrl(state.settings.apiBaseUrl), {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${state.settings.apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: DEFAULT_MODEL,
+      messages: [
+        {
+          role: 'user',
+          content
+        }
+      ],
+      temperature: state.settings.temperature
+    }),
+    signal: state.abortController.signal
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`API 错误 (${response.status}): ${errorText}`);
+  }
+
+  const data = await response.json();
+  const rawContent = normalizeReturnedContent(data?.choices?.[0]?.message?.content) || data?.output_text || '';
+  const contentText = await imageResponseToMarkdown(data, assistantMsg.id, rawContent);
+  const markdownProcessed = await convertImagesInContent(contentText, assistantMsg.id);
+  const processedContent = await convertRawDataUrlsInContent(markdownProcessed, assistantMsg.id);
+  assistantMsg.content = processedContent || markdownProcessed || contentText || '(无内容)';
+  assistantMsg._rendered = await resolveContentImages(assistantMsg.content);
+}
+
+async function sendMessage() {
+  if (state.isGenerating) return;
+  const input = document.getElementById('messageInput');
+  const text = input.value.trim();
+  const attachedImages = [...state.pendingImages];
+  const hasImages = attachedImages.length > 0;
+
+  if (!text && !hasImages) return;
+
+  if (!state.settings.apiKey) {
+    alert('请先在设置中配置 API Key');
+    openSettings();
+    return;
+  }
+
+  let chat = getCurrentChat();
+  if (!chat) {
+    await newChat();
+    chat = getCurrentChat();
+  }
+
+  const userMsg = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    role: 'user',
+    content: text,
+    images: attachedImages.map(img => img.id),
+    hasImages
+  };
+  chat.messages.push(userMsg);
+
+  if (chat.messages.filter(m => m.role === 'user').length === 1) {
+    chat.title = text.slice(0, 30) || (hasImages ? '图片对话' : '新对话');
+  }
+
+  const assistantMsg = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+    role: 'assistant',
+    content: ''
+  };
+  chat.messages.push(assistantMsg);
+
+  input.value = '';
+  input.style.height = 'auto';
+  state.pendingImages = [];
+  clearImagePreviews();
+  saveToStorage();
+  renderChatList();
+  await renderMessages();
+
+  state.isGenerating = true;
+  state.abortController = new AbortController();
+  startWaitingTimer();
+  updateUI();
+  await renderMessages(true);
+
+  try {
+    const requestContent = await buildContentString(text, userMsg.images);
+    await requestChatCompletion(requestContent, assistantMsg);
+
+    state.isGenerating = false;
+    state.abortController = null;
+    stopWaitingTimer();
+    saveToStorage();
+    await renderMessages();
+    updateUI();
+    scrollToBottom();
+
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      assistantMsg.content = assistantMsg.content || '(已停止生成)';
+    } else {
+      assistantMsg.content = '❌ 错误: ' + err.message;
+    }
+    state.isGenerating = false;
+    state.abortController = null;
+    stopWaitingTimer();
+    saveToStorage();
+    await renderMessages();
+    updateUI();
+  }
+}
+
+function stopGeneration() {
+  if (state.abortController) {
+    state.abortController.abort();
+    state.abortController = null;
+  }
+}
+
+// ===== FIRST-TIME USER PROMPT =====
+function showFirstTimePrompt() {
+  document.getElementById('firstTimeModal').style.display = 'flex';
+}
+
+function saveFirstTimeApiKey() {
+  const apiKey = document.getElementById('firstTimeApiKey').value.trim();
+  if (!apiKey) {
+    alert('请输入 NEW_API_KEY');
+    return;
+  }
+  state.settings.apiKey = apiKey;
+  saveToStorage();
+  document.getElementById('firstTimeModal').style.display = 'none';
+}
+
+// ===== IMAGE HANDLING =====
+function handleImageUpload(event) {
+  const files = event.target.files;
+  if (!files) return;
+  for (const file of files) {
+    addImage(file);
+  }
+  event.target.value = '';
+}
+
+function handlePaste(event) {
+  const items = event.clipboardData?.items;
+  if (!items) return;
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      event.preventDefault();
+      const file = item.getAsFile();
+      addImage(file);
+    }
+  }
+}
+
+async function addImage(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    // Save image to IndexedDB and store ID
+    const imageId = generateImageId();
+    await saveImageToDB(imageId, e.target.result, { name: file.name, mime: file.type });
+    state.pendingImages.push({
+      name: file.name,
+      id: imageId,
+      dataUrl: e.target.result // Keep in memory for preview and API
+    });
+    renderImagePreviews();
+  };
+  reader.readAsDataURL(file);
+}
+
+function compressImage(dataUrl, maxWidth, maxHeight, quality, callback) {
+  const img = new Image();
+  img.onload = () => {
+    let width = img.width;
+    let height = img.height;
+
+    if (width > maxWidth || height > maxHeight) {
+      const ratio = Math.min(maxWidth / width, maxHeight / height);
+      width = Math.round(width * ratio);
+      height = Math.round(height * ratio);
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, width, height);
+
+    callback(canvas.toDataURL('image/jpeg', quality));
+  };
+  img.src = dataUrl;
+}
+
+function removeImage(index) {
+  state.pendingImages.splice(index, 1);
+  renderImagePreviews();
+}
+
+function renderImagePreviews() {
+  const area = document.getElementById('imagePreviewArea');
+  if (state.pendingImages.length === 0) {
+    area.innerHTML = '';
+    area.style.display = 'none';
+    return;
+  }
+  area.style.display = 'flex';
+  area.innerHTML = state.pendingImages.map((img, i) => `
+    <div class="image-preview-item">
+      <img src="${img.dataUrl}" alt="${img.name}">
+      <button class="remove-img" onclick="removeImage(${i})">×</button>
+    </div>
+  `).join('');
+}
+
+function clearImagePreviews() {
+  state.pendingImages = [];
+  renderImagePreviews();
+}
+
+// ===== INPUT HANDLING =====
+function handleKeyDown(event) {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    sendMessage();
+  }
+}
+
+function autoResize() {
+  const textarea = document.getElementById('messageInput');
+  textarea.style.height = 'auto';
+  textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
+}
+
+// ===== UI UPDATES =====
+function updateUI() {
+  const chat = getCurrentChat();
+  document.getElementById('chatTitle').textContent = chat ? (chat.title || '新对话') : '新对话';
+  document.getElementById('modelBadge').textContent = DEFAULT_MODEL;
+  document.getElementById('sendBtn').disabled = state.isGenerating;
+  document.getElementById('stopBtn').className = state.isGenerating ? 'stop-btn visible' : 'stop-btn';
+}
+
+// ===== SIDEBAR TOGGLE =====
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('collapsed');
+}
+
+// ===== THEME =====
+function toggleTheme() {
+  state.theme = state.theme === 'light' ? 'dark' : 'light';
+  applyTheme();
+  saveToStorage();
+}
+
+function applyTheme() {
+  document.body.setAttribute('data-theme', state.theme);
+  const icon = state.theme === 'light' ? '🌙' : '☀';
+  document.querySelectorAll('#themeBtn, #themeBtn2').forEach(b => b.textContent = icon);
+}
+
+// ===== SETTINGS =====
+function openSettings() {
+  document.getElementById('apiBaseUrl').value = state.settings.apiBaseUrl;
+  document.getElementById('apiKey').value = state.settings.apiKey;
+  document.getElementById('modelName').value = DEFAULT_MODEL;
+  document.getElementById('temperature').value = state.settings.temperature;
+  document.getElementById('contextLength').value = state.settings.contextLength || 3;
+  document.getElementById('systemPrompt').value = state.settings.systemPrompt || '';
+  document.getElementById('settingsModal').style.display = 'flex';
+}
+
+function closeSettings() {
+  document.getElementById('settingsModal').style.display = 'none';
+}
+
+function saveSettings() {
+  state.settings.apiBaseUrl = normalizeApiUrl(document.getElementById('apiBaseUrl').value);
+  state.settings.apiKey = document.getElementById('apiKey').value.trim();
+  state.settings.model = DEFAULT_MODEL;
+  state.settings.temperature = parseFloat(document.getElementById('temperature').value) || 0.7;
+  state.settings.contextLength = Math.min(Math.max(parseInt(document.getElementById('contextLength').value) || 3, 1), 10);
+  state.settings.systemPrompt = document.getElementById('systemPrompt').value.trim();
+  saveToStorage();
+  updateUI();
+  closeSettings();
+}
+
+document.getElementById('settingsModal').addEventListener('click', function(e) {
+  if (e.target === this) closeSettings();
+});
+
+// ===== INIT =====
+init();
+updateUI();
+</script>
+</body>
+</html>
