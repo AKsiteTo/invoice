@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Idea Chat</title>
+<link rel="icon" href="public/idea.ico">
 <style>
 :root {
   --bg: #ffffff;
@@ -275,7 +276,9 @@ body{
   justify-content:center;
   font-size:16px;
   font-weight:600;
+  overflow:hidden;
 }
+.avatar img{width:100%;height:100%;object-fit:cover}
 .message.user .avatar{background:#dbeafe;color:#2563eb}
 .message.assistant .avatar{background:var(--accent-light);color:var(--accent)}
 .message .content{
@@ -286,7 +289,6 @@ body{
   word-break:break-word;
 }
 .message.user .content{
-  text-align:right;
 }
 .message .content p{margin-bottom:8px}
 .message .content p:last-child{margin-bottom:0}
@@ -392,7 +394,7 @@ body{
   padding:8px 12px 0;
   display:flex;
   align-items:center;
-  justify-content:flex-end;
+  justify-content:flex-start;
   gap:4px;
 }
 .input-inner{
@@ -546,10 +548,26 @@ body{
 .typing-indicator span:nth-child(3){animation-delay:.4s}
 @keyframes typing{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-8px);opacity:1}}
 
-/* ===== RESPONSIVE ===== */
+/* ===== SIDEBAR BACKDROP (mobile) ===== */
+.sidebar-backdrop{
+  display:none;
+  position:fixed;inset:0;
+  background:rgba(0,0,0,.35);
+  z-index:40;
+}
 @media (max-width:640px){
-  .sidebar{display:none}
-  .sidebar.collapsed{display:none}
+  .sidebar{
+    position:fixed;top:0;left:0;bottom:0;
+    z-index:50;
+    transform:translateX(-100%);
+    transition:transform .3s ease;
+    box-shadow:none;
+  }
+  .sidebar:not(.collapsed){
+    transform:translateX(0);
+    box-shadow:4px 0 20px rgba(0,0,0,.15);
+  }
+  .sidebar-backdrop.visible{display:block}
   .message{padding:12px 12px}
   .messages-container{max-width:100%}
   .input-wrapper{max-width:100%}
@@ -560,10 +578,8 @@ body{
   .welcome h1{font-size:22px}
   .message .avatar{width:28px;height:28px;font-size:14px}
   .message .content{font-size:13px}
-  /* Ensure chat area takes full available height minus input area */
   .main{height:100vh;height:calc(100vh - env(safe-area-inset-bottom))}
   .chat-area{flex:1;overflow-y:auto}
-  /* Add padding at bottom to prevent input from covering last message */
   .messages-container{padding-bottom:40px;padding-bottom:calc(20px + env(safe-area-inset-bottom))}
 }
 
@@ -591,6 +607,7 @@ body{
 <body data-theme="light">
 
 <!-- ===== SIDEBAR ===== -->
+<div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()"></div>
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-header">
     <h2>对话列表</h2>
@@ -599,6 +616,7 @@ body{
   <button class="new-chat-btn" onclick="newChat()">＋ 新建对话</button>
   <div class="chat-list" id="chatList"></div>
   <div class="sidebar-footer">
+    <button class="btn-danger" style="flex:1" onclick="clearAllHistory()" title="清空所有历史记录">🗑 清空历史</button>
     <button class="btn-outline" style="flex:1" onclick="openSettings()">⚙ 设置</button>
     <button class="theme-toggle" onclick="toggleTheme()" title="切换主题" id="themeBtn">🌙</button>
   </div>
@@ -1050,6 +1068,11 @@ async function init() {
   applyTheme();
   document.addEventListener('paste', handlePaste);
 
+  // On mobile, start sidebar collapsed
+  if (window.innerWidth <= 640) {
+    document.getElementById('sidebar').classList.add('collapsed');
+  }
+
   // Check if first-time user (no API key)
   if (!state.settings.apiKey) {
     showFirstTimePrompt();
@@ -1219,6 +1242,41 @@ async function deleteChat(id) {
   updateUI();
 }
 
+async function clearAllHistory() {
+  if (!confirm('确定要清空所有历史记录吗？\n\n此操作不可撤销，所有对话和图片将被删除，但 NEW_API_KEY 设置会保留。')) return;
+
+  if (db) {
+    try {
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction([STORE_NAME], 'readwrite');
+        const req = tx.objectStore(STORE_NAME).clear();
+        req.onsuccess = () => resolve();
+        req.onerror = () => reject(req.error);
+      });
+    } catch(e) { console.error('清除 AIChatDB 失败:', e); }
+  }
+
+  try {
+    const imageDB = await getImageDB();
+    await new Promise((resolve, reject) => {
+      const tx = imageDB.transaction(['images'], 'readwrite');
+      const req = tx.objectStore('images').clear();
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+  } catch(e) { console.error('清除 ai_chat_images 失败:', e); }
+
+  state.chats = [];
+  state.currentChatId = null;
+  state.pendingImages = [];
+
+  saveToStorage();
+  renderChatList();
+  await renderMessages();
+  clearImagePreviews();
+  updateUI();
+}
+
 function getCurrentChat() {
   return state.chats.find(c => c.id === state.currentChatId) || null;
 }
@@ -1247,7 +1305,7 @@ async function renderMessages(isNewStream = false) {
   // Load images from IndexedDB for user messages
   const messagesHtml = await Promise.all(messagesToRender.map(async (msg) => {
     const isUser = msg.role === 'user';
-    const avatar = isUser ? '👤' : '🤖';
+    const avatar = isUser ? '<img src="public/user.png">' : '🤖';
     let contentHtml = '';
 
     if (isUser) {
@@ -1811,7 +1869,12 @@ function updateUI() {
 
 // ===== SIDEBAR TOGGLE =====
 function toggleSidebar() {
-  document.getElementById('sidebar').classList.toggle('collapsed');
+  const sidebar = document.getElementById('sidebar');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  sidebar.classList.toggle('collapsed');
+  if (backdrop) {
+    backdrop.classList.toggle('visible', !sidebar.classList.contains('collapsed'));
+  }
 }
 
 // ===== THEME =====
