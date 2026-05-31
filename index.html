@@ -666,11 +666,6 @@ body{
     </div>
     <div class="modal-body">
       <div class="form-group">
-        <label>API 请求路径</label>
-        <input type="text" id="apiBaseUrl" placeholder="https://newapi.lxhei.xyz/v1/chat/completions">
-        <div class="hint">填写完整 API 请求地址，将按原样请求</div>
-      </div>
-      <div class="form-group">
         <label>NEW_API_KEY</label>
         <input type="password" id="apiKey" placeholder="输入你的 API Key">
         <div class="hint">对应接口中的 NEW_API_KEY，仅保存在浏览器本地</div>
@@ -687,8 +682,8 @@ body{
       </div>
       <div class="form-group">
         <label>上下文条数</label>
-        <input type="number" id="contextLength" placeholder="3" min="1" max="10" step="1">
-        <div class="hint">每次请求携带的历史消息条数，默认 3，取值范围 1-10</div>
+        <input type="number" id="contextLength" placeholder="3" min="3" max="5" step="1">
+        <div class="hint">每次请求携带的历史消息条数，默认 3，取值范围 3-5</div>
       </div>
       <div class="form-group">
         <label>系统提示词（可选）</label>
@@ -829,14 +824,15 @@ function getMessageImageIds(msg) {
 // ===== STATE =====
 const DEFAULT_API_URL = 'https://newapi.lxhei.xyz/v1/chat/completions';
 const DEFAULT_MODEL = 'gpt-image-2';
-const LARGE_IMAGE_THRESHOLD_BYTES = 5 * 1024 * 1024;
-const LARGE_IMAGE_COMPRESS_QUALITY = 0.8;
+const UPLOAD_IMAGE_MAX_SIZE = 2048;
+const UPLOAD_IMAGE_QUALITY = 0.78;
+const HISTORY_IMAGE_MAX_COUNT = 1;
+const REQUEST_PAYLOAD_WARNING_BYTES = 8 * 1024 * 1024;
 
 const state = {
   chats: [],
   currentChatId: null,
   settings: {
-    apiBaseUrl: DEFAULT_API_URL,
     apiKey: '',
     model: DEFAULT_MODEL,
     systemPrompt: '',
@@ -853,27 +849,39 @@ const state = {
   imageCache: {} // Cache for loaded images
 };
 
+function normalizeContextLength(value) {
+  return Math.min(Math.max(parseInt(value, 10) || 3, 3), 5);
+}
+
+function shouldCarryHistoryImage(text) {
+  return /(上一张|上张|刚才那张|刚刚那张|这张图|这张图片|上图|上面.*图|前面.*图|上一轮.*图|参考图|参考上一|继续改|继续处理|基于.*图|保持.*一致)/.test(text || '');
+}
+
+function getByteLength(value) {
+  return new Blob([value || '']).size;
+}
+
 // ===== WAITING MESSAGES =====
 const WAITING_PHASES = {
   phase1: [
-    '📡 信号已发出，正在呼叫大模型…',
-    '🧠 大模型从休眠中唤醒…',
-    '☕ 给它几秒钟，冲杯咖啡先'
+    '请求已提交，正在等待模型响应…',
+    '正在建立连接并发送请求…',
+    '处理中，请稍候…'
   ],
   phase2: [
-    '🤔 它托着腮帮子想啊想…',
-    '⚡ 神经元正在疯狂放电',
-    '📚 翻遍了今天的知识库',
-    '💡 灵感好像快来了…',
-    '🎲 扔了个骰子，决定认真回答',
-    '🌀 思维风暴正在生成中',
-    '🦾 检查一遍，别闹笑话',
-    '🎬 它清了清嗓子，准备打字了'
+    '模型正在处理当前请求…',
+    '正在根据输入内容生成结果…',
+    '请求仍在处理中，请保持页面打开…',
+    '图片或长上下文可能需要更长时间…',
+    '正在等待服务端返回结果…',
+    '处理中，耗时会受图片大小和网络影响…',
+    '请求未结束，请继续等待…',
+    '正在接收模型处理结果…'
   ],
   phase3: [
-    '✍️ 答案已经写好了，就差发送…',
-    '📨 正在打包回复，注意查收',
-    '✨ 来吧，答案即将揭晓！'
+    '请求耗时较长，仍在等待响应…',
+    '服务端尚未返回完整结果，请稍候…',
+    '如果长时间无响应，可以停止后重试。'
   ]
 };
 
@@ -1077,6 +1085,8 @@ async function init() {
   if (!state.settings.apiKey) {
     showFirstTimePrompt();
   }
+
+  scrollToBottom();
 }
 
 async function loadFromStorage() {
@@ -1086,8 +1096,8 @@ async function loadFromStorage() {
       const data = JSON.parse(saved);
       state.chats = data.chats || [];
       state.settings = {...state.settings, ...data.settings};
-      state.settings.apiBaseUrl = normalizeApiUrl(state.settings.apiBaseUrl);
       state.settings.model = DEFAULT_MODEL;
+      state.settings.contextLength = normalizeContextLength(state.settings.contextLength);
       state.theme = data.theme || 'light';
 
       // localStorage keeps only image IDs; bytes live in IndexedDB.
@@ -1165,12 +1175,6 @@ async function cleanupOldChats() {
     }
     state.chats = state.chats.slice(0, 5);
   }
-}
-
-function normalizeApiUrl(value) {
-  const url = (value || '').trim().replace(/\/+$/, '');
-  if (!url) return DEFAULT_API_URL;
-  return url;
 }
 
 // ===== SIDEBAR / CHAT LIST =====
@@ -1376,10 +1380,10 @@ function updateStreamingContent(content) {
 }
 
 function scrollToBottom() {
-  requestAnimationFrame(() => {
+  setTimeout(() => {
     const area = document.getElementById('chatArea');
     area.scrollTop = area.scrollHeight;
-  });
+  }, 50);
 }
 
 // ===== IMAGE LIGHTBOX =====
@@ -1529,10 +1533,11 @@ async function getImageUrlForApi(imageId) {
   return record.dataUrl;
 }
 
-async function buildUserMessageContent(text, imageIds) {
-  const prompt = [state.settings.systemPrompt, text].filter(Boolean).join('\n\n').trim();
+async function buildUserMessageContent(text, imageIds, options = {}) {
+  const prompt = (text || '').trim();
+  const imageList = Array.isArray(imageIds) ? imageIds : [];
 
-  if (!imageIds.length) {
+  if (!imageList.length) {
     return prompt || '请继续。';
   }
 
@@ -1543,8 +1548,9 @@ async function buildUserMessageContent(text, imageIds) {
     }
   ];
 
-  for (let i = 0; i < imageIds.length; i++) {
-    const imageId = imageIds[i];
+  const maxImages = Number.isFinite(options.maxImages) ? options.maxImages : imageList.length;
+  for (let i = 0; i < Math.min(imageList.length, maxImages); i++) {
+    const imageId = imageList[i];
     const imageUrl = await getImageUrlForApi(imageId);
     if (!imageUrl) continue;
     parts.push({
@@ -1554,6 +1560,78 @@ async function buildUserMessageContent(text, imageIds) {
   }
 
   return parts;
+}
+
+async function buildMessageForApi(msg, options = {}) {
+  if (!msg || (msg.role !== 'user' && msg.role !== 'assistant')) return null;
+
+  const text = (msg.content || '').trim();
+  const imageIds = Array.isArray(msg.images) ? msg.images : [];
+
+  if (msg.role === 'user') {
+    if (!text && imageIds.length === 0) return null;
+    if (imageIds.length > 0 && options.includeImages === false) {
+      const imageHint = `[历史图片 ${imageIds.length} 张，默认不重复上传原图]`;
+      return {
+        role: 'user',
+        content: [text, imageHint].filter(Boolean).join('\n\n')
+      };
+    }
+    return {
+      role: 'user',
+      content: await buildUserMessageContent(text, imageIds, { maxImages: options.maxImages })
+    };
+  }
+
+  if (!text) return null;
+  return {
+    role: 'assistant',
+    content: text
+  };
+}
+
+async function buildRequestMessages(chat, currentUserMsg) {
+  const limit = normalizeContextLength(state.settings.contextLength);
+  state.settings.contextLength = limit;
+  const carryHistoryImage = shouldCarryHistoryImage(currentUserMsg?.content || '');
+
+  const chatMessages = chat?.messages || [];
+  const currentIndex = currentUserMsg ? chatMessages.findIndex(msg => msg.id === currentUserMsg.id) : -1;
+  const historySource = currentIndex >= 0 ? chatMessages.slice(0, currentIndex) : chatMessages;
+  const validHistory = historySource.filter(msg => {
+    if (!msg || (msg.role !== 'user' && msg.role !== 'assistant')) return false;
+    if (msg.role === 'user') return Boolean((msg.content || '').trim()) || (Array.isArray(msg.images) && msg.images.length > 0);
+    return Boolean((msg.content || '').trim());
+  }).slice(-limit);
+
+  const historyImageMessages = new Set();
+  if (carryHistoryImage) {
+    for (let i = validHistory.length - 1; i >= 0 && historyImageMessages.size < HISTORY_IMAGE_MAX_COUNT; i--) {
+      const msg = validHistory[i];
+      if (Array.isArray(msg.images) && msg.images.length > 0) historyImageMessages.add(msg);
+    }
+  }
+
+  const messages = [];
+  const systemPrompt = (state.settings.systemPrompt || '').trim();
+  if (systemPrompt) {
+    messages.push({ role: 'system', content: systemPrompt });
+  }
+
+  for (const msg of validHistory) {
+    const imageCount = Array.isArray(msg.images) ? msg.images.length : 0;
+    const includeImages = imageCount > 0 && historyImageMessages.has(msg);
+    const apiMessage = await buildMessageForApi(msg, {
+      includeImages,
+      maxImages: includeImages ? 1 : 0
+    });
+    if (apiMessage) messages.push(apiMessage);
+  }
+
+  const currentMessage = await buildMessageForApi(currentUserMsg, { includeImages: true });
+  if (currentMessage) messages.push(currentMessage);
+
+  return messages;
 }
 
 function normalizeReturnedContent(content) {
@@ -1604,23 +1682,24 @@ async function imageResponseToMarkdown(data, messageId, fallbackContent = '') {
   return chunks.join('\n\n').trim();
 }
 
-async function requestChatCompletion(content, assistantMsg) {
-  const response = await fetch(normalizeApiUrl(state.settings.apiBaseUrl), {
+async function requestChatCompletion(messages, assistantMsg) {
+  const requestBody = JSON.stringify({
+    model: DEFAULT_MODEL,
+    messages,
+    temperature: state.settings.temperature
+  });
+
+  if (getByteLength(requestBody) > REQUEST_PAYLOAD_WARNING_BYTES) {
+    throw new Error('请求内容过大，请减少图片数量或降低图片大小后重试');
+  }
+
+  const response = await fetch(DEFAULT_API_URL, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${state.settings.apiKey}`,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({
-      model: DEFAULT_MODEL,
-      messages: [
-        {
-          role: 'user',
-          content
-        }
-      ],
-      temperature: state.settings.temperature
-    }),
+    body: requestBody,
     signal: state.abortController.signal
   });
 
@@ -1694,8 +1773,8 @@ async function sendMessage() {
   await renderMessages(true);
 
   try {
-    const requestContent = await buildUserMessageContent(text, userMsg.images);
-    await requestChatCompletion(requestContent, assistantMsg);
+    const requestMessages = await buildRequestMessages(chat, userMsg);
+    await requestChatCompletion(requestMessages, assistantMsg);
 
     state.isGenerating = false;
     state.abortController = null;
@@ -1769,17 +1848,11 @@ async function addImage(file) {
   if (!file || !file.type.startsWith('image/')) return;
   const reader = new FileReader();
   reader.onload = async (e) => {
-    let dataUrl = e.target.result;
-    let storedName = file.name;
-    let storedMime = file.type;
-
-    if (file.size > LARGE_IMAGE_THRESHOLD_BYTES) {
-      dataUrl = await new Promise(resolve => {
-        compressImage(e.target.result, 4096, 4096, LARGE_IMAGE_COMPRESS_QUALITY, resolve);
-      });
-      storedName = file.name.replace(/(\.[^.]+)?$/, '_compressed.jpg');
-      storedMime = 'image/jpeg';
-    }
+    const dataUrl = await new Promise(resolve => {
+      compressImage(e.target.result, UPLOAD_IMAGE_MAX_SIZE, UPLOAD_IMAGE_MAX_SIZE, UPLOAD_IMAGE_QUALITY, resolve);
+    });
+    const storedName = file.name.replace(/(\.[^.]+)?$/, '_compressed.jpg');
+    const storedMime = 'image/jpeg';
 
     // Save image to IndexedDB and store ID
     const imageId = generateImageId();
@@ -1810,6 +1883,8 @@ function compressImage(dataUrl, maxWidth, maxHeight, quality, callback) {
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, width, height);
     ctx.drawImage(img, 0, 0, width, height);
 
     callback(canvas.toDataURL('image/jpeg', quality));
@@ -1892,11 +1967,10 @@ function applyTheme() {
 
 // ===== SETTINGS =====
 function openSettings() {
-  document.getElementById('apiBaseUrl').value = state.settings.apiBaseUrl;
   document.getElementById('apiKey').value = state.settings.apiKey;
   document.getElementById('modelName').value = DEFAULT_MODEL;
   document.getElementById('temperature').value = state.settings.temperature;
-  document.getElementById('contextLength').value = state.settings.contextLength || 3;
+  document.getElementById('contextLength').value = normalizeContextLength(state.settings.contextLength);
   document.getElementById('systemPrompt').value = state.settings.systemPrompt || '';
   document.getElementById('settingsModal').style.display = 'flex';
 }
@@ -1906,11 +1980,10 @@ function closeSettings() {
 }
 
 function saveSettings() {
-  state.settings.apiBaseUrl = normalizeApiUrl(document.getElementById('apiBaseUrl').value);
   state.settings.apiKey = document.getElementById('apiKey').value.trim();
   state.settings.model = DEFAULT_MODEL;
   state.settings.temperature = parseFloat(document.getElementById('temperature').value) || 0.7;
-  state.settings.contextLength = Math.min(Math.max(parseInt(document.getElementById('contextLength').value) || 3, 1), 10);
+  state.settings.contextLength = normalizeContextLength(document.getElementById('contextLength').value);
   state.settings.systemPrompt = document.getElementById('systemPrompt').value.trim();
   saveToStorage();
   updateUI();
