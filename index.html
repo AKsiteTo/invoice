@@ -548,6 +548,25 @@ body{
 .typing-indicator span:nth-child(3){animation-delay:.4s}
 @keyframes typing{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-8px);opacity:1}}
 
+/* ===== NOTICE BANNER ===== */
+.notice-banner{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:10px 16px;margin:0 16px 8px;
+  background:var(--accent-light);border:1px solid var(--accent);
+  border-radius:var(--radius-sm);font-size:13px;color:var(--text-secondary);
+  animation:noticeFadeIn .3s ease;
+}
+.notice-banner svg{flex-shrink:0;width:18px;height:18px;color:var(--accent)}
+.notice-dismiss{
+  flex-shrink:0;background:none;border:none;cursor:pointer;
+  font-size:18px;color:var(--text-secondary);padding:2px 6px;border-radius:4px;
+}
+.notice-dismiss:hover{background:var(--bg-hover)}
+@keyframes noticeFadeIn{
+  from{opacity:0;transform:translateY(-8px)}
+  to{opacity:1;transform:translateY(0)}
+}
+
 /* ===== SIDEBAR BACKDROP (mobile) ===== */
 .sidebar-backdrop{
   display:none;
@@ -631,6 +650,11 @@ body{
     <button class="btn-icon" onclick="openSettings()" title="设置">⚙</button>
     <button class="theme-toggle" onclick="toggleTheme()" title="切换主题" id="themeBtn2">🌙</button>
   </div>
+  <div class="notice-banner" id="noticeBanner" style="display:none">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+    <span>温馨提示：图片生成通常需要 <b>40 秒至 1 分 30 秒</b>，请耐心等候。如长时间未响应，可能是图片或提示词触发了内容审核，建议更换后重试。</span>
+    <button class="notice-dismiss" onclick="dismissNotice()" title="知道了">✕</button>
+  </div>
   <div class="chat-area" id="chatArea">
     <div class="welcome">
       <h1>Idea Chat</h1>
@@ -676,14 +700,9 @@ body{
         <div class="hint">三种模式统一使用 gpt-image-2</div>
       </div>
       <div class="form-group">
-        <label>Temperature</label>
-        <input type="number" id="temperature" placeholder="0.7" min="0" max="2" step="0.1">
-        <div class="hint">控制输出随机性，0-2 之间，默认 0.7</div>
-      </div>
-      <div class="form-group">
         <label>上下文条数</label>
-        <input type="number" id="contextLength" placeholder="3" min="3" max="5" step="1">
-        <div class="hint">每次请求携带的历史消息条数，默认 3，取值范围 3-5</div>
+        <input type="number" id="contextLength" value="1" placeholder="1" min="1" max="5" step="1">
+        <div class="hint">每次请求携带的历史消息条数，默认 1，取值范围 1-5</div>
       </div>
       <div class="form-group">
         <label>系统提示词（可选）</label>
@@ -828,6 +847,7 @@ const UPLOAD_IMAGE_MAX_SIZE = 2048;
 const UPLOAD_IMAGE_QUALITY = 0.78;
 const HISTORY_IMAGE_MAX_COUNT = 1;
 const REQUEST_PAYLOAD_WARNING_BYTES = 8 * 1024 * 1024;
+const DEFAULT_USER_SUFFIX = '\n\n整体画面弱化微小细节，避免过度可画';
 
 const state = {
   chats: [],
@@ -836,8 +856,7 @@ const state = {
     apiKey: '',
     model: DEFAULT_MODEL,
     systemPrompt: '',
-    temperature: 0.7,
-    contextLength: 3
+    contextLength: 1
   },
   isGenerating: false,
   abortController: null,
@@ -850,7 +869,7 @@ const state = {
 };
 
 function normalizeContextLength(value) {
-  return Math.min(Math.max(parseInt(value, 10) || 3, 3), 5);
+  return Math.min(Math.max(parseInt(value, 10) || 1, 1), 5);
 }
 
 function shouldCarryHistoryImage(text) {
@@ -1086,6 +1105,7 @@ async function init() {
     showFirstTimePrompt();
   }
 
+  showNoticeBanner();
   scrollToBottom();
 }
 
@@ -1097,7 +1117,6 @@ async function loadFromStorage() {
       state.chats = data.chats || [];
       state.settings = {...state.settings, ...data.settings};
       state.settings.model = DEFAULT_MODEL;
-      state.settings.contextLength = normalizeContextLength(state.settings.contextLength);
       state.theme = data.theme || 'light';
 
       // localStorage keeps only image IDs; bytes live in IndexedDB.
@@ -1569,17 +1588,18 @@ async function buildMessageForApi(msg, options = {}) {
   const imageIds = Array.isArray(msg.images) ? msg.images : [];
 
   if (msg.role === 'user') {
-    if (!text && imageIds.length === 0) return null;
+    const userText = (text + DEFAULT_USER_SUFFIX).trim();
+    if (!userText && imageIds.length === 0) return null;
     if (imageIds.length > 0 && options.includeImages === false) {
       const imageHint = `[历史图片 ${imageIds.length} 张，默认不重复上传原图]`;
       return {
         role: 'user',
-        content: [text, imageHint].filter(Boolean).join('\n\n')
+        content: [userText, imageHint].filter(Boolean).join('\n\n')
       };
     }
     return {
       role: 'user',
-      content: await buildUserMessageContent(text, imageIds, { maxImages: options.maxImages })
+      content: await buildUserMessageContent(userText, imageIds, { maxImages: options.maxImages })
     };
   }
 
@@ -1592,7 +1612,6 @@ async function buildMessageForApi(msg, options = {}) {
 
 async function buildRequestMessages(chat, currentUserMsg) {
   const limit = normalizeContextLength(state.settings.contextLength);
-  state.settings.contextLength = limit;
   const carryHistoryImage = shouldCarryHistoryImage(currentUserMsg?.content || '');
 
   const chatMessages = chat?.messages || [];
@@ -1685,8 +1704,7 @@ async function imageResponseToMarkdown(data, messageId, fallbackContent = '') {
 async function requestChatCompletion(messages, assistantMsg) {
   const requestBody = JSON.stringify({
     model: DEFAULT_MODEL,
-    messages,
-    temperature: state.settings.temperature
+    messages
   });
 
   if (getByteLength(requestBody) > REQUEST_PAYLOAD_WARNING_BYTES) {
@@ -1804,6 +1822,17 @@ function stopGeneration() {
     state.abortController.abort();
     state.abortController = null;
   }
+}
+
+// ===== NOTICE BANNER =====
+function showNoticeBanner() {
+  if (localStorage.getItem('ai_notice_migrated_v1')) return;
+  document.getElementById('noticeBanner').style.display = 'flex';
+}
+
+function dismissNotice() {
+  document.getElementById('noticeBanner').style.display = 'none';
+  localStorage.setItem('ai_notice_migrated_v1', '1');
 }
 
 // ===== FIRST-TIME USER PROMPT =====
@@ -1969,7 +1998,6 @@ function applyTheme() {
 function openSettings() {
   document.getElementById('apiKey').value = state.settings.apiKey;
   document.getElementById('modelName').value = DEFAULT_MODEL;
-  document.getElementById('temperature').value = state.settings.temperature;
   document.getElementById('contextLength').value = normalizeContextLength(state.settings.contextLength);
   document.getElementById('systemPrompt').value = state.settings.systemPrompt || '';
   document.getElementById('settingsModal').style.display = 'flex';
@@ -1982,7 +2010,6 @@ function closeSettings() {
 function saveSettings() {
   state.settings.apiKey = document.getElementById('apiKey').value.trim();
   state.settings.model = DEFAULT_MODEL;
-  state.settings.temperature = parseFloat(document.getElementById('temperature').value) || 0.7;
   state.settings.contextLength = normalizeContextLength(document.getElementById('contextLength').value);
   state.settings.systemPrompt = document.getElementById('systemPrompt').value.trim();
   saveToStorage();
