@@ -700,11 +700,6 @@ body{
         <div class="hint">三种模式统一使用 gpt-image-2</div>
       </div>
       <div class="form-group">
-        <label>上下文条数</label>
-        <input type="number" id="contextLength" value="1" placeholder="1" min="1" max="5" step="1">
-        <div class="hint">每次请求携带的历史消息条数，默认 1，取值范围 1-5</div>
-      </div>
-      <div class="form-group">
         <label>系统提示词（可选）</label>
         <input type="text" id="systemPrompt" placeholder="你是一个有帮助的助手">
       </div>
@@ -855,8 +850,7 @@ const state = {
   settings: {
     apiKey: '',
     model: DEFAULT_MODEL,
-    systemPrompt: '',
-    contextLength: 1
+    systemPrompt: ''
   },
   isGenerating: false,
   abortController: null,
@@ -1611,7 +1605,7 @@ async function buildMessageForApi(msg, options = {}) {
 }
 
 async function buildRequestMessages(chat, currentUserMsg) {
-  const limit = normalizeContextLength(state.settings.contextLength);
+  const limit = 2;
   const carryHistoryImage = shouldCarryHistoryImage(currentUserMsg?.content || '');
 
   const chatMessages = chat?.messages || [];
@@ -1998,7 +1992,6 @@ function applyTheme() {
 function openSettings() {
   document.getElementById('apiKey').value = state.settings.apiKey;
   document.getElementById('modelName').value = DEFAULT_MODEL;
-  document.getElementById('contextLength').value = normalizeContextLength(state.settings.contextLength);
   document.getElementById('systemPrompt').value = state.settings.systemPrompt || '';
   document.getElementById('settingsModal').style.display = 'flex';
 }
@@ -2010,7 +2003,6 @@ function closeSettings() {
 function saveSettings() {
   state.settings.apiKey = document.getElementById('apiKey').value.trim();
   state.settings.model = DEFAULT_MODEL;
-  state.settings.contextLength = normalizeContextLength(document.getElementById('contextLength').value);
   state.settings.systemPrompt = document.getElementById('systemPrompt').value.trim();
   saveToStorage();
   updateUI();
