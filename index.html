@@ -504,6 +504,13 @@ body{
 }
 .form-group input:focus,.form-group select:focus{border-color:var(--accent)}
 .form-group .hint{font-size:11px;color:var(--text-secondary);margin-top:4px}
+.api-profile-row{
+  display:flex;
+  gap:8px;
+  align-items:center;
+}
+.api-profile-row select{flex:1}
+.api-profile-row button{padding:8px 12px}
 .modal-footer{
   display:flex;
   justify-content:flex-end;
@@ -690,14 +697,41 @@ body{
     </div>
     <div class="modal-body">
       <div class="form-group">
+        <label>API 配置方案</label>
+        <div class="api-profile-row">
+          <select id="apiProfileSelect" onchange="switchApiProfileForm(this.value)"></select>
+          <button class="btn-outline" onclick="addApiProfileForm()">新增</button>
+          <button class="btn-outline" onclick="deleteApiProfileForm()">删除</button>
+        </div>
+        <div class="hint">每个方案绑定一个 API 请求路径和 Key，切换方案即可切换请求配置</div>
+      </div>
+      <div class="form-group">
+        <label>方案名称</label>
+        <input type="text" id="apiProfileName" placeholder="例如：主账号 / 备用线路">
+      </div>
+      <div class="form-group">
+        <label>API 请求路径</label>
+        <input type="text" id="apiBaseUrl" placeholder="https://newapi.lxhei.xyz/v1/chat/completions">
+        <div class="hint">填写完整 API 请求地址，将按当前方案请求</div>
+      </div>
+      <div class="form-group">
         <label>NEW_API_KEY</label>
-        <input type="password" id="apiKey" placeholder="输入你的 API Key">
-        <div class="hint">对应接口中的 NEW_API_KEY，仅保存在浏览器本地</div>
+        <input type="password" id="apiKey" placeholder="输入当前方案的 API Key">
+        <div class="hint">Key 仅保存在浏览器本地，并与当前方案绑定</div>
       </div>
       <div class="form-group">
         <label>模型名称</label>
         <input type="text" id="modelName" value="gpt-image-2" readonly>
         <div class="hint">三种模式统一使用 gpt-image-2</div>
+      </div>
+      <div class="form-group">
+        <label>上下文模式</label>
+        <select id="contextMode">
+          <option value="auto">自动判断</option>
+          <option value="currentOnly">仅当前消息</option>
+          <option value="always">总是携带上下文</option>
+        </select>
+        <div class="hint">默认自动判断：当前消息没有明显指代时，不携带历史，避免旧话题干扰</div>
       </div>
       <div class="form-group">
         <label>系统提示词（可选）</label>
@@ -848,8 +882,12 @@ const state = {
   chats: [],
   currentChatId: null,
   settings: {
+    apiBaseUrl: DEFAULT_API_URL,
     apiKey: '',
+    apiProfiles: [],
+    activeApiProfileId: 'default',
     model: DEFAULT_MODEL,
+    contextMode: 'auto',
     systemPrompt: ''
   },
   isGenerating: false,
@@ -862,8 +900,26 @@ const state = {
   imageCache: {} // Cache for loaded images
 };
 
+let apiSettingsDraft = null;
+
 function normalizeContextLength(value) {
   return Math.min(Math.max(parseInt(value, 10) || 1, 1), 5);
+}
+
+function normalizeContextMode(value) {
+  return ['auto', 'currentOnly', 'always'].includes(value) ? value : 'auto';
+}
+
+function shouldUseHistoryContext(text) {
+  return /(继续|接着|上面|上文|前面|上一条|上一轮|之前|刚才|刚刚|这个|这张|这条|它|按这个|基于上文|参考上文|参考上图|参考上一|上一张|上图|保持.*一致|沿用|照着|同样|再改|再生成|重做|改成)/.test(text || '');
+}
+
+function buildSystemPromptWithContextPolicy(hasHistory) {
+  const systemPrompt = (state.settings.systemPrompt || '').trim();
+  if (!hasHistory) return systemPrompt;
+
+  const policy = '请优先处理最后一条用户消息。历史对话仅用于理解指代、风格和约束；如果最后一条用户消息与历史主题不一致，请忽略历史主题，不要综合回答历史问题。';
+  return [systemPrompt, policy].filter(Boolean).join('\n\n');
 }
 
 function shouldCarryHistoryImage(text) {
@@ -872,6 +928,89 @@ function shouldCarryHistoryImage(text) {
 
 function getByteLength(value) {
   return new Blob([value || '']).size;
+}
+
+function normalizeApiUrl(value) {
+  const url = (value || '').trim();
+  return url || DEFAULT_API_URL;
+}
+
+function generateApiProfileId() {
+  return `api_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function createApiProfile(profile = {}) {
+  return {
+    id: profile.id || generateApiProfileId(),
+    name: (profile.name || '默认配置').trim() || '默认配置',
+    apiUrl: normalizeApiUrl(profile.apiUrl || profile.apiBaseUrl),
+    apiKey: (profile.apiKey || '').trim()
+  };
+}
+
+function normalizeApiProfiles(profiles, fallbackApiUrl, fallbackApiKey) {
+  const source = Array.isArray(profiles) ? profiles : [];
+  if (source.length === 0) {
+    return [createApiProfile({
+      id: 'default',
+      name: '默认配置',
+      apiUrl: fallbackApiUrl,
+      apiKey: fallbackApiKey
+    })];
+  }
+
+  const normalized = source.map((profile, index) => createApiProfile({
+    ...profile,
+    name: profile.name || (index === 0 ? '默认配置' : `配置 ${index + 1}`),
+    apiUrl: profile.apiUrl || profile.apiBaseUrl || DEFAULT_API_URL,
+    apiKey: typeof profile.apiKey === 'string' ? profile.apiKey : ''
+  }));
+
+  const seen = new Set();
+  for (const profile of normalized) {
+    if (!profile.id || seen.has(profile.id)) profile.id = generateApiProfileId();
+    seen.add(profile.id);
+  }
+
+  return normalized;
+}
+
+function getActiveApiProfile() {
+  const profiles = state.settings.apiProfiles || [];
+  return profiles.find(profile => profile.id === state.settings.activeApiProfileId) || profiles[0] || null;
+}
+
+function syncActiveApiProfileToSettings() {
+  const active = getActiveApiProfile();
+  if (active) {
+    state.settings.apiBaseUrl = normalizeApiUrl(active.apiUrl);
+    state.settings.apiKey = (active.apiKey || '').trim();
+    return;
+  }
+  state.settings.apiBaseUrl = normalizeApiUrl(state.settings.apiBaseUrl);
+  state.settings.apiKey = (state.settings.apiKey || '').trim();
+}
+
+function normalizeApiSettings() {
+  state.settings.apiProfiles = normalizeApiProfiles(
+    state.settings.apiProfiles,
+    state.settings.apiBaseUrl,
+    state.settings.apiKey
+  );
+  if (!state.settings.apiProfiles.some(profile => profile.id === state.settings.activeApiProfileId)) {
+    state.settings.activeApiProfileId = state.settings.apiProfiles[0].id;
+  }
+  syncActiveApiProfileToSettings();
+}
+
+function getCurrentApiUrl() {
+  const active = getActiveApiProfile();
+  return normalizeApiUrl(active ? active.apiUrl : state.settings.apiBaseUrl);
+}
+
+function getCurrentApiKey() {
+  const active = getActiveApiProfile();
+  return (active ? active.apiKey : state.settings.apiKey || '').trim();
 }
 
 // ===== WAITING MESSAGES =====
@@ -1082,6 +1221,8 @@ async function normalizeStoredMessageImages(msg) {
 async function init() {
   await initDB();
   await loadFromStorage();
+  state.settings.contextMode = normalizeContextMode(state.settings.contextMode);
+  normalizeApiSettings();
   renderChatList();
   if (state.chats.length > 0) {
     switchChat(state.chats[0].id);
@@ -1095,7 +1236,7 @@ async function init() {
   }
 
   // Check if first-time user (no API key)
-  if (!state.settings.apiKey) {
+  if (!getCurrentApiKey()) {
     showFirstTimePrompt();
   }
 
@@ -1111,6 +1252,8 @@ async function loadFromStorage() {
       state.chats = data.chats || [];
       state.settings = {...state.settings, ...data.settings};
       state.settings.model = DEFAULT_MODEL;
+      state.settings.contextMode = normalizeContextMode(state.settings.contextMode);
+      normalizeApiSettings();
       state.theme = data.theme || 'light';
 
       // localStorage keeps only image IDs; bytes live in IndexedDB.
@@ -1412,6 +1555,7 @@ function showLightbox(src) {
 async function imageUrlToBase64(url) {
   try {
     const response = await fetch(url);
+    if (!response.ok) return null;
     const blob = await response.blob();
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -1423,6 +1567,31 @@ async function imageUrlToBase64(url) {
     console.error('图片转换失败:', e);
     return null;
   }
+}
+
+function cacheRemoteImageInBackground(key, url) {
+  if (!key || !/^https?:\/\//i.test(url || '')) return;
+  const run = async () => {
+    const base64 = await imageUrlToBase64(url);
+    if (!base64) return;
+    try {
+      await saveImageToDB(key, base64);
+    } catch (e) {
+      console.error('后台缓存图片失败:', e);
+    }
+  };
+  if (typeof requestIdleCallback === 'function') {
+    requestIdleCallback(run, { timeout: 10000 });
+  } else {
+    setTimeout(run, 1000);
+  }
+}
+
+async function saveImageReferenceToDB(key, value) {
+  if (!key || !value) return false;
+  await saveImageToDB(key, value);
+  cacheRemoteImageInBackground(key, value);
+  return true;
 }
 
 // Convert markdown images in content: store bytes in IndexedDB, keep only IDX markers in localStorage.
@@ -1443,11 +1612,11 @@ async function convertImagesInContent(content, messageId) {
   let newContent = content;
   for (let i = 0; i < matches.length; i++) {
     const { full, alt, url } = matches[i];
-    const imageData = isDataUrl(url) ? url : await imageUrlToBase64(url);
+    const imageData = isDataUrl(url) || /^https?:\/\//i.test(url) ? url : await imageUrlToBase64(url);
     const storedImage = imageData || (/^https?:\/\//i.test(url) ? url : '');
     if (storedImage) {
       const imgKey = generateContentImageId(messageId, i);
-      await saveImageToDB(imgKey, storedImage);
+      await saveImageReferenceToDB(imgKey, storedImage);
       newContent = newContent.replace(full, `![${alt || '图片'}](IDX:${imgKey})`);
     }
   }
@@ -1606,16 +1775,20 @@ async function buildMessageForApi(msg, options = {}) {
 
 async function buildRequestMessages(chat, currentUserMsg) {
   const limit = 2;
-  const carryHistoryImage = shouldCarryHistoryImage(currentUserMsg?.content || '');
+  const currentText = currentUserMsg?.content || '';
+  const contextMode = normalizeContextMode(state.settings.contextMode);
+  state.settings.contextMode = contextMode;
+  const shouldIncludeHistory = contextMode === 'always' || (contextMode === 'auto' && shouldUseHistoryContext(currentText));
+  const carryHistoryImage = shouldIncludeHistory && shouldCarryHistoryImage(currentText);
 
   const chatMessages = chat?.messages || [];
   const currentIndex = currentUserMsg ? chatMessages.findIndex(msg => msg.id === currentUserMsg.id) : -1;
   const historySource = currentIndex >= 0 ? chatMessages.slice(0, currentIndex) : chatMessages;
-  const validHistory = historySource.filter(msg => {
+  const validHistory = shouldIncludeHistory ? historySource.filter(msg => {
     if (!msg || (msg.role !== 'user' && msg.role !== 'assistant')) return false;
     if (msg.role === 'user') return Boolean((msg.content || '').trim()) || (Array.isArray(msg.images) && msg.images.length > 0);
     return Boolean((msg.content || '').trim());
-  }).slice(-limit);
+  }).slice(-limit) : [];
 
   const historyImageMessages = new Set();
   if (carryHistoryImage) {
@@ -1626,7 +1799,7 @@ async function buildRequestMessages(chat, currentUserMsg) {
   }
 
   const messages = [];
-  const systemPrompt = (state.settings.systemPrompt || '').trim();
+  const systemPrompt = buildSystemPromptWithContextPolicy(shouldIncludeHistory);
   if (systemPrompt) {
     messages.push({ role: 'system', content: systemPrompt });
   }
@@ -1679,10 +1852,9 @@ async function imageResponseToMarkdown(data, messageId, fallbackContent = '') {
       await saveImageToDB(key, `data:image/png;base64,${item.b64_json}`);
       chunks.push(`![生成图片](IDX:${key})`);
     } else if (item.url) {
-      const base64 = await imageUrlToBase64(item.url);
-      const storedImage = base64 || item.url;
+      const storedImage = item.url;
       if (storedImage) {
-        await saveImageToDB(key, storedImage);
+        await saveImageReferenceToDB(key, storedImage);
         chunks.push(`![生成图片](IDX:${key})`);
       }
     }
@@ -1705,10 +1877,10 @@ async function requestChatCompletion(messages, assistantMsg) {
     throw new Error('请求内容过大，请减少图片数量或降低图片大小后重试');
   }
 
-  const response = await fetch(DEFAULT_API_URL, {
+  const response = await fetch(getCurrentApiUrl(), {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${state.settings.apiKey}`,
+      'Authorization': `Bearer ${getCurrentApiKey()}`,
       'Content-Type': 'application/json'
     },
     body: requestBody,
@@ -1738,7 +1910,7 @@ async function sendMessage() {
 
   if (!text && !hasImages) return;
 
-  if (!state.settings.apiKey) {
+  if (!getCurrentApiKey()) {
     alert('请先在设置中配置 API Key');
     openSettings();
     return;
@@ -1840,7 +2012,10 @@ function saveFirstTimeApiKey() {
     alert('请输入 NEW_API_KEY');
     return;
   }
-  state.settings.apiKey = apiKey;
+  normalizeApiSettings();
+  const activeProfile = getActiveApiProfile();
+  if (activeProfile) activeProfile.apiKey = apiKey;
+  syncActiveApiProfileToSettings();
   saveToStorage();
   document.getElementById('firstTimeModal').style.display = 'none';
 }
@@ -1989,20 +2164,116 @@ function applyTheme() {
 }
 
 // ===== SETTINGS =====
+function startApiSettingsDraft() {
+  normalizeApiSettings();
+  apiSettingsDraft = {
+    profiles: state.settings.apiProfiles.map(profile => ({...profile})),
+    activeApiProfileId: state.settings.activeApiProfileId
+  };
+}
+
+function getDraftApiProfile() {
+  if (!apiSettingsDraft) return null;
+  return apiSettingsDraft.profiles.find(profile => profile.id === apiSettingsDraft.activeApiProfileId) || apiSettingsDraft.profiles[0] || null;
+}
+
+function renderApiProfileSelect() {
+  const select = document.getElementById('apiProfileSelect');
+  if (!select || !apiSettingsDraft) return;
+
+  select.innerHTML = '';
+  for (const profile of apiSettingsDraft.profiles) {
+    const option = document.createElement('option');
+    option.value = profile.id;
+    option.textContent = profile.name || '未命名配置';
+    select.appendChild(option);
+  }
+  select.value = apiSettingsDraft.activeApiProfileId;
+}
+
+function fillApiProfileForm() {
+  const profile = getDraftApiProfile();
+  if (!profile) return;
+
+  document.getElementById('apiProfileName').value = profile.name || '';
+  document.getElementById('apiBaseUrl').value = profile.apiUrl || DEFAULT_API_URL;
+  document.getElementById('apiKey').value = profile.apiKey || '';
+}
+
+function saveApiProfileFormToDraft() {
+  const profile = getDraftApiProfile();
+  if (!profile) return;
+
+  profile.name = document.getElementById('apiProfileName').value.trim() || '未命名配置';
+  profile.apiUrl = normalizeApiUrl(document.getElementById('apiBaseUrl').value);
+  profile.apiKey = document.getElementById('apiKey').value.trim();
+}
+
+function switchApiProfileForm(id) {
+  if (!apiSettingsDraft || !apiSettingsDraft.profiles.some(profile => profile.id === id)) return;
+  saveApiProfileFormToDraft();
+  apiSettingsDraft.activeApiProfileId = id;
+  renderApiProfileSelect();
+  fillApiProfileForm();
+}
+
+function addApiProfileForm() {
+  if (!apiSettingsDraft) startApiSettingsDraft();
+  saveApiProfileFormToDraft();
+
+  const profile = createApiProfile({
+    name: `配置 ${apiSettingsDraft.profiles.length + 1}`,
+    apiUrl: DEFAULT_API_URL,
+    apiKey: ''
+  });
+  apiSettingsDraft.profiles.push(profile);
+  apiSettingsDraft.activeApiProfileId = profile.id;
+  renderApiProfileSelect();
+  fillApiProfileForm();
+}
+
+function deleteApiProfileForm() {
+  if (!apiSettingsDraft || apiSettingsDraft.profiles.length <= 1) {
+    alert('至少保留一个 API 配置方案');
+    return;
+  }
+
+  const deletingId = apiSettingsDraft.activeApiProfileId;
+  apiSettingsDraft.profiles = apiSettingsDraft.profiles.filter(profile => profile.id !== deletingId);
+  apiSettingsDraft.activeApiProfileId = apiSettingsDraft.profiles[0].id;
+  renderApiProfileSelect();
+  fillApiProfileForm();
+}
+
+function commitApiSettingsDraft() {
+  if (!apiSettingsDraft) startApiSettingsDraft();
+  saveApiProfileFormToDraft();
+
+  state.settings.apiProfiles = apiSettingsDraft.profiles.map(profile => createApiProfile(profile));
+  state.settings.activeApiProfileId = apiSettingsDraft.activeApiProfileId;
+  normalizeApiSettings();
+  apiSettingsDraft = null;
+}
+
 function openSettings() {
-  document.getElementById('apiKey').value = state.settings.apiKey;
+  startApiSettingsDraft();
+  renderApiProfileSelect();
+  fillApiProfileForm();
   document.getElementById('modelName').value = DEFAULT_MODEL;
+  document.getElementById('contextMode').value = normalizeContextMode(state.settings.contextMode);
   document.getElementById('systemPrompt').value = state.settings.systemPrompt || '';
   document.getElementById('settingsModal').style.display = 'flex';
 }
 
 function closeSettings() {
+  apiSettingsDraft = null;
   document.getElementById('settingsModal').style.display = 'none';
 }
 
 function saveSettings() {
-  state.settings.apiKey = document.getElementById('apiKey').value.trim();
+  commitApiSettingsDraft();
   state.settings.model = DEFAULT_MODEL;
+  state.settings.contextMode = normalizeContextMode(document.getElementById('contextMode').value);
   state.settings.systemPrompt = document.getElementById('systemPrompt').value.trim();
   saveToStorage();
   updateUI();
