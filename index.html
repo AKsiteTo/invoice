@@ -504,13 +504,6 @@ body{
 }
 .form-group input:focus,.form-group select:focus{border-color:var(--accent)}
 .form-group .hint{font-size:11px;color:var(--text-secondary);margin-top:4px}
-.api-profile-row{
-  display:flex;
-  gap:8px;
-  align-items:center;
-}
-.api-profile-row select{flex:1}
-.api-profile-row button{padding:8px 12px}
 .modal-footer{
   display:flex;
   justify-content:flex-end;
@@ -653,7 +646,7 @@ body{
   <div class="topbar">
     <button class="toggle-sidebar" onclick="toggleSidebar()" title="展开侧边栏">☰</button>
     <span class="title" id="chatTitle">新对话</span>
-    <span class="model-badge" id="modelBadge">gpt-image-2</span>
+    <span class="model-badge" id="modelBadge">gpt-image-2.5-flare</span>
     <button class="btn-icon" onclick="openSettings()" title="设置">⚙</button>
     <button class="theme-toggle" onclick="toggleTheme()" title="切换主题" id="themeBtn2">🌙</button>
   </div>
@@ -697,32 +690,18 @@ body{
     </div>
     <div class="modal-body">
       <div class="form-group">
-        <label>API 配置方案</label>
-        <div class="api-profile-row">
-          <select id="apiProfileSelect" onchange="switchApiProfileForm(this.value)"></select>
-          <button class="btn-outline" onclick="addApiProfileForm()">新增</button>
-          <button class="btn-outline" onclick="deleteApiProfileForm()">删除</button>
-        </div>
-        <div class="hint">每个方案绑定一个 API 请求路径和 Key，切换方案即可切换请求配置</div>
-      </div>
-      <div class="form-group">
-        <label>方案名称</label>
-        <input type="text" id="apiProfileName" placeholder="例如：主账号 / 备用线路">
-      </div>
-      <div class="form-group">
-        <label>API 请求路径</label>
-        <input type="text" id="apiBaseUrl" placeholder="https://newapi.lxhei.xyz/v1/chat/completions">
-        <div class="hint">填写完整 API 请求地址，将按当前方案请求</div>
-      </div>
-      <div class="form-group">
         <label>NEW_API_KEY</label>
-        <input type="password" id="apiKey" placeholder="输入当前方案的 API Key">
-        <div class="hint">Key 仅保存在浏览器本地，并与当前方案绑定</div>
+        <input type="password" id="apiKey" placeholder="输入你的 API Key" autocomplete="off">
+        <div class="hint">填写 Key 即可使用，Key 仅保存在浏览器本地</div>
+        <div class="hint">自动识别参考图片，支持 PNG 上传与 PNG 出图</div>
       </div>
       <div class="form-group">
         <label>模型名称</label>
-        <input type="text" id="modelName" value="gpt-image-2" readonly>
-        <div class="hint">三种模式统一使用 gpt-image-2</div>
+        <select id="modelName">
+          <option value="gpt-image-2.5-flare" selected>gpt-image-2.5-flare</option>
+          <option value="gpt-image-2.5-sunburst">gpt-image-2.5-sunburst</option>
+        </select>
+        <div class="hint">按所选模型生成或编辑图片</div>
       </div>
       <div class="form-group">
         <label>上下文模式</label>
@@ -755,7 +734,7 @@ body{
       <p style="margin-bottom:16px;color:var(--text-secondary)">请填写 NEW_API_KEY 以开始使用</p>
       <div class="form-group">
         <label>NEW_API_KEY</label>
-        <input type="password" id="firstTimeApiKey" placeholder="输入你的 API Key">
+        <input type="password" id="firstTimeApiKey" placeholder="输入你的 API Key" autocomplete="off">
         <div class="hint">对应接口中的 NEW_API_KEY，仅保存在浏览器本地</div>
       </div>
     </div>
@@ -870,8 +849,11 @@ function getMessageImageIds(msg) {
 }
 
 // ===== STATE =====
-const DEFAULT_API_URL = 'https://newapi.lxhei.xyz/v1/chat/completions';
-const DEFAULT_MODEL = 'gpt-image-2';
+const API_BASE_URL = 'https://e0b00642f591.nofx.one';
+const IMAGE_GENERATION_API_URL = `${API_BASE_URL}/v1/images/generations`;
+const IMAGE_EDIT_API_URL = `${API_BASE_URL}/v1/images/edits`;
+const DEFAULT_MODEL = 'gpt-image-2.5-flare';
+const SUPPORTED_MODELS = [DEFAULT_MODEL, 'gpt-image-2.5-sunburst'];
 const UPLOAD_IMAGE_MAX_SIZE = 2048;
 const UPLOAD_IMAGE_QUALITY = 0.78;
 const HISTORY_IMAGE_MAX_COUNT = 1;
@@ -882,10 +864,7 @@ const state = {
   chats: [],
   currentChatId: null,
   settings: {
-    apiBaseUrl: DEFAULT_API_URL,
     apiKey: '',
-    apiProfiles: [],
-    activeApiProfileId: 'default',
     model: DEFAULT_MODEL,
     contextMode: 'auto',
     systemPrompt: ''
@@ -900,7 +879,13 @@ const state = {
   imageCache: {} // Cache for loaded images
 };
 
-let apiSettingsDraft = null;
+function normalizeModel(value) {
+  return SUPPORTED_MODELS.includes(value) ? value : DEFAULT_MODEL;
+}
+
+function getCurrentModel() {
+  return normalizeModel(state.settings.model);
+}
 
 function normalizeContextLength(value) {
   return Math.min(Math.max(parseInt(value, 10) || 1, 1), 5);
@@ -930,87 +915,21 @@ function getByteLength(value) {
   return new Blob([value || '']).size;
 }
 
-function normalizeApiUrl(value) {
-  const url = (value || '').trim();
-  return url || DEFAULT_API_URL;
-}
-
-function generateApiProfileId() {
-  return `api_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function createApiProfile(profile = {}) {
-  return {
-    id: profile.id || generateApiProfileId(),
-    name: (profile.name || '默认配置').trim() || '默认配置',
-    apiUrl: normalizeApiUrl(profile.apiUrl || profile.apiBaseUrl),
-    apiKey: (profile.apiKey || '').trim()
-  };
-}
-
-function normalizeApiProfiles(profiles, fallbackApiUrl, fallbackApiKey) {
-  const source = Array.isArray(profiles) ? profiles : [];
-  if (source.length === 0) {
-    return [createApiProfile({
-      id: 'default',
-      name: '默认配置',
-      apiUrl: fallbackApiUrl,
-      apiKey: fallbackApiKey
-    })];
-  }
-
-  const normalized = source.map((profile, index) => createApiProfile({
-    ...profile,
-    name: profile.name || (index === 0 ? '默认配置' : `配置 ${index + 1}`),
-    apiUrl: profile.apiUrl || profile.apiBaseUrl || DEFAULT_API_URL,
-    apiKey: typeof profile.apiKey === 'string' ? profile.apiKey : ''
-  }));
-
-  const seen = new Set();
-  for (const profile of normalized) {
-    if (!profile.id || seen.has(profile.id)) profile.id = generateApiProfileId();
-    seen.add(profile.id);
-  }
-
-  return normalized;
-}
-
-function getActiveApiProfile() {
-  const profiles = state.settings.apiProfiles || [];
-  return profiles.find(profile => profile.id === state.settings.activeApiProfileId) || profiles[0] || null;
-}
-
-function syncActiveApiProfileToSettings() {
-  const active = getActiveApiProfile();
-  if (active) {
-    state.settings.apiBaseUrl = normalizeApiUrl(active.apiUrl);
-    state.settings.apiKey = (active.apiKey || '').trim();
-    return;
-  }
-  state.settings.apiBaseUrl = normalizeApiUrl(state.settings.apiBaseUrl);
-  state.settings.apiKey = (state.settings.apiKey || '').trim();
-}
-
 function normalizeApiSettings() {
-  state.settings.apiProfiles = normalizeApiProfiles(
-    state.settings.apiProfiles,
-    state.settings.apiBaseUrl,
-    state.settings.apiKey
-  );
-  if (!state.settings.apiProfiles.some(profile => profile.id === state.settings.activeApiProfileId)) {
-    state.settings.activeApiProfileId = state.settings.apiProfiles[0].id;
-  }
-  syncActiveApiProfileToSettings();
-}
-
-function getCurrentApiUrl() {
-  const active = getActiveApiProfile();
-  return normalizeApiUrl(active ? active.apiUrl : state.settings.apiBaseUrl);
+  const migrated = ['apiProfiles', 'activeApiProfileId', 'apiBaseUrl', 'apiUrl'].some(key => Object.hasOwn(state.settings, key));
+  const profiles = Array.isArray(state.settings.apiProfiles) ? state.settings.apiProfiles : [];
+  const active = profiles.find(profile => profile?.id === state.settings.activeApiProfileId);
+  const apiKey = active && typeof active.apiKey === 'string' ? active.apiKey : state.settings.apiKey;
+  state.settings.apiKey = typeof apiKey === 'string' ? apiKey.trim() : '';
+  delete state.settings.apiProfiles;
+  delete state.settings.activeApiProfileId;
+  delete state.settings.apiBaseUrl;
+  delete state.settings.apiUrl;
+  return migrated;
 }
 
 function getCurrentApiKey() {
-  const active = getActiveApiProfile();
-  return (active ? active.apiKey : state.settings.apiKey || '').trim();
+  return (state.settings.apiKey || '').trim();
 }
 
 // ===== WAITING MESSAGES =====
@@ -1242,6 +1161,7 @@ async function init() {
 
   showNoticeBanner();
   scrollToBottom();
+  updateUI();
 }
 
 async function loadFromStorage() {
@@ -1251,13 +1171,13 @@ async function loadFromStorage() {
       const data = JSON.parse(saved);
       state.chats = data.chats || [];
       state.settings = {...state.settings, ...data.settings};
-      state.settings.model = DEFAULT_MODEL;
+      state.settings.model = normalizeModel(state.settings.model);
       state.settings.contextMode = normalizeContextMode(state.settings.contextMode);
-      normalizeApiSettings();
+      const migratedApiSettings = normalizeApiSettings();
       state.theme = data.theme || 'light';
 
       // localStorage keeps only image IDs; bytes live in IndexedDB.
-      let needsSave = false;
+      let needsSave = migratedApiSettings;
       for (const chat of state.chats) {
         for (const msg of chat.messages) {
           if (await normalizeStoredMessageImages(msg)) needsSave = true;
@@ -1709,6 +1629,45 @@ function escapeHtml(str) {
 }
 
 // ===== API CALL =====
+let localApiProxyPromise = null;
+
+function hasLocalApiProxy() {
+  if (!['http:', 'https:'].includes(window.location.protocol)) return Promise.resolve(false);
+  if (!localApiProxyPromise) {
+    localApiProxyPromise = fetch('/api/health', { signal: AbortSignal.timeout(2000) })
+      .then(async response => {
+        if (!response.ok) return false;
+        const data = await response.json();
+        return data.service === 'idea-chat' && data.proxy === true;
+      })
+      .catch(() => false);
+  }
+  return localApiProxyPromise;
+}
+
+async function fetchApiRequest(url, options) {
+  let target;
+  try {
+    target = new URL(url);
+    if (!['http:', 'https:'].includes(target.protocol) || target.username || target.password) throw new Error('Invalid URL');
+  } catch {
+    throw new Error('请在设置中填写有效的 HTTP/HTTPS API 请求地址');
+  }
+
+  const useProxy = await hasLocalApiProxy();
+  options.signal?.throwIfAborted();
+  const headers = new Headers(options.headers);
+  if (useProxy) headers.set('X-API-URL', target.href);
+  try {
+    return await fetch(useProxy ? '/api/proxy' : target.href, { ...options, headers });
+  } catch (error) {
+    if (error.name === 'AbortError' || options.signal?.aborted) throw error;
+    throw new Error(useProxy
+      ? '无法连接本地 API 转发服务，请确认 node server.js 仍在运行'
+      : '浏览器无法连接 API，可能是 CORS 预检被拒绝或网络异常。请运行 node server.js，并通过终端显示的本地地址打开页面后重试');
+  }
+}
+
 async function getImageUrlForApi(imageId) {
   const record = await getImageRecordFromDB(imageId);
   if (!record?.dataUrl) return '';
@@ -1767,6 +1726,15 @@ async function buildMessageForApi(msg, options = {}) {
   }
 
   if (!text) return null;
+  if (options.includeImages) {
+    const content = [{ type: 'text', text }];
+    const imageIds = getMessageImageIds(msg).slice(0, options.maxImages || HISTORY_IMAGE_MAX_COUNT);
+    for (const imageId of imageIds) {
+      const imageUrl = await getImageUrlForApi(imageId);
+      if (imageUrl) content.push({ type: 'image_url', image_url: { url: imageUrl } });
+    }
+    return { role: 'assistant', content };
+  }
   return {
     role: 'assistant',
     content: text
@@ -1779,7 +1747,7 @@ async function buildRequestMessages(chat, currentUserMsg) {
   const contextMode = normalizeContextMode(state.settings.contextMode);
   state.settings.contextMode = contextMode;
   const shouldIncludeHistory = contextMode === 'always' || (contextMode === 'auto' && shouldUseHistoryContext(currentText));
-  const carryHistoryImage = shouldIncludeHistory && shouldCarryHistoryImage(currentText);
+  const carryHistoryImage = shouldIncludeHistory && shouldCarryHistoryImage(currentText) && !(currentUserMsg?.images?.length);
 
   const chatMessages = chat?.messages || [];
   const currentIndex = currentUserMsg ? chatMessages.findIndex(msg => msg.id === currentUserMsg.id) : -1;
@@ -1794,7 +1762,7 @@ async function buildRequestMessages(chat, currentUserMsg) {
   if (carryHistoryImage) {
     for (let i = validHistory.length - 1; i >= 0 && historyImageMessages.size < HISTORY_IMAGE_MAX_COUNT; i--) {
       const msg = validHistory[i];
-      if (Array.isArray(msg.images) && msg.images.length > 0) historyImageMessages.add(msg);
+      if (getMessageImageIds(msg).length > 0) historyImageMessages.add(msg);
     }
   }
 
@@ -1805,7 +1773,7 @@ async function buildRequestMessages(chat, currentUserMsg) {
   }
 
   for (const msg of validHistory) {
-    const imageCount = Array.isArray(msg.images) ? msg.images.length : 0;
+    const imageCount = getMessageImageIds(msg).length;
     const includeImages = imageCount > 0 && historyImageMessages.has(msg);
     const apiMessage = await buildMessageForApi(msg, {
       includeImages,
@@ -1820,6 +1788,25 @@ async function buildRequestMessages(chat, currentUserMsg) {
   return messages;
 }
 
+function getImageMimeFromBase64(base64, fallback = 'image/png') {
+  const bytes = (base64 || '').replace(/\s/g, '');
+  if (bytes.startsWith('iVBORw0KGgo')) return 'image/png';
+  if (bytes.startsWith('/9j/')) return 'image/jpeg';
+  if (bytes.startsWith('UklGR')) return 'image/webp';
+  if (bytes.startsWith('R0lGOD')) return 'image/gif';
+  const formats = { png: 'image/png', jpeg: 'image/jpeg', jpg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif' };
+  const normalized = (fallback || '').toLowerCase();
+  return formats[normalized] || (Object.values(formats).includes(normalized) ? normalized : 'image/png');
+}
+
+function returnedImageDataUrl(value, format = 'png') {
+  if (typeof value !== 'string' || !value.trim()) return '';
+  const dataUrl = /^data:(image\/[^;]+);base64,([\s\S]+)$/i.exec(value.trim());
+  const base64 = (dataUrl ? dataUrl[2] : value).replace(/\s/g, '');
+  const mime = getImageMimeFromBase64(base64, dataUrl ? dataUrl[1] : format);
+  return `data:${mime};base64,${base64}`;
+}
+
 function normalizeReturnedContent(content) {
   if (typeof content === 'string') return content;
   if (!Array.isArray(content)) return '';
@@ -1829,7 +1816,8 @@ function normalizeReturnedContent(content) {
     if (part?.text) return part.text;
     if (part?.image_url?.url) return `![生成图片](${part.image_url.url})`;
     if (part?.url) return `![生成图片](${part.url})`;
-    if (part?.b64_json) return `![生成图片](data:image/png;base64,${part.b64_json})`;
+    if (part?.b64_json) return `![生成图片](${returnedImageDataUrl(part.b64_json, part.output_format || part.mime_type || 'png')})`;
+    if (part?.data_url) return `![生成图片](${returnedImageDataUrl(part.data_url)})`;
     return '';
   }).filter(Boolean).join('\n\n');
 }
@@ -1837,8 +1825,42 @@ function normalizeReturnedContent(content) {
 function extractImageItems(data) {
   if (Array.isArray(data?.data)) return data.data;
   if (Array.isArray(data?.images)) return data.images;
-  if (data?.url || data?.b64_json) return [data];
+  if (data?.url || data?.b64_json || data?.data_url) return [data];
   return [];
+}
+
+function getImageApiUrl(hasImages) {
+  return hasImages ? IMAGE_EDIT_API_URL : IMAGE_GENERATION_API_URL;
+}
+
+function stripImageReferences(text) {
+  return (text || '')
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, '')
+    .replace(/data:image\/[^;\s]+;base64,[A-Za-z0-9+/=]+/gi, '')
+    .replace(/IDX:[^\s)]+/g, '')
+    .trim();
+}
+
+function buildImageRequest(messages) {
+  const prompts = [];
+  const imageUrls = [];
+  for (let index = 0; index < messages.length; index++) {
+    const message = messages[index];
+    const parts = Array.isArray(message.content) ? message.content : [{ type: 'text', text: message.content || '' }];
+    const text = stripImageReferences(parts.filter(part => part.type === 'text' || part.text).map(part => part.text || '').join('\n'));
+    if (text) {
+      const label = message.role === 'system' ? '系统要求' : index === messages.length - 1 ? '当前要求' : message.role === 'assistant' ? '历史结果说明' : '历史要求';
+      prompts.push(messages.length === 1 ? text : `${label}：\n${text}`);
+    }
+    for (const part of parts) {
+      const imageUrl = typeof part.image_url === 'string' ? part.image_url : part.image_url?.url;
+      if (imageUrl && !imageUrls.includes(imageUrl)) imageUrls.push(imageUrl);
+    }
+  }
+  const body = { model: getCurrentModel(), prompt: prompts.join('\n\n'), n: 1, output_format: 'png' };
+  // This gateway accepts reference URLs/data URLs as images[].image_url JSON.
+  if (imageUrls.length) body.images = imageUrls.map(image_url => ({ image_url }));
+  return { url: getImageApiUrl(imageUrls.length > 0), body };
 }
 
 async function imageResponseToMarkdown(data, messageId, fallbackContent = '') {
@@ -1848,8 +1870,11 @@ async function imageResponseToMarkdown(data, messageId, fallbackContent = '') {
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
     const key = generateContentImageId(messageId, i);
-    if (item.b64_json) {
-      await saveImageToDB(key, `data:image/png;base64,${item.b64_json}`);
+    if (item.b64_json || item.data_url || isDataUrl(item.url)) {
+      const dataUrl = returnedImageDataUrl(item.b64_json || item.data_url || item.url, item.output_format || item.mime_type || data?.output_format || 'png');
+      const mime = getDataUrlMime(dataUrl);
+      const extension = mime === 'image/jpeg' ? 'jpg' : mime.split('/')[1] || 'png';
+      await saveImageToDB(key, dataUrl, { name: `${key}.${extension}`, mime });
       chunks.push(`![生成图片](IDX:${key})`);
     } else if (item.url) {
       const storedImage = item.url;
@@ -1858,6 +1883,7 @@ async function imageResponseToMarkdown(data, messageId, fallbackContent = '') {
         chunks.push(`![生成图片](IDX:${key})`);
       }
     }
+    if (item.revised_prompt) chunks.push(item.revised_prompt);
   }
 
   const chatContent = fallbackContent || normalizeReturnedContent(data?.choices?.[0]?.message?.content) || data?.output_text || '';
@@ -1867,32 +1893,38 @@ async function imageResponseToMarkdown(data, messageId, fallbackContent = '') {
   return chunks.join('\n\n').trim();
 }
 
-async function requestChatCompletion(messages, assistantMsg) {
-  const requestBody = JSON.stringify({
-    model: DEFAULT_MODEL,
-    messages
-  });
+async function requestImageGeneration(messages, assistantMsg, signal = state.abortController?.signal) {
+  signal?.throwIfAborted();
+  const imageRequest = buildImageRequest(messages);
+  const requestBody = JSON.stringify(imageRequest.body);
 
   if (getByteLength(requestBody) > REQUEST_PAYLOAD_WARNING_BYTES) {
     throw new Error('请求内容过大，请减少图片数量或降低图片大小后重试');
   }
 
-  const response = await fetch(getCurrentApiUrl(), {
+  const response = await fetchApiRequest(imageRequest.url, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${getCurrentApiKey()}`,
       'Content-Type': 'application/json'
     },
     body: requestBody,
-    signal: state.abortController.signal
+    signal
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`API 错误 (${response.status}): ${errorText}`);
+    let errorMessage = errorText;
+    try { errorMessage = JSON.parse(errorText)?.error?.message || errorText; } catch {}
+    throw new Error(`API 错误 (${response.status}): ${errorMessage.slice(0, 1000) || '服务拒绝请求，请检查 Key、模型权限和接口路径'}`);
   }
 
-  const data = await response.json();
+  let data;
+  try { data = await response.json(); }
+  catch (error) {
+    if (error.name === 'AbortError') throw error;
+    throw new Error('API 返回的内容不是 JSON，请检查请求地址是否为完整接口路径');
+  }
   const rawContent = normalizeReturnedContent(data?.choices?.[0]?.message?.content) || data?.output_text || '';
   const contentText = await imageResponseToMarkdown(data, assistantMsg.id, rawContent);
   const markdownProcessed = await convertImagesInContent(contentText, assistantMsg.id);
@@ -1951,14 +1983,15 @@ async function sendMessage() {
   await renderMessages();
 
   state.isGenerating = true;
-  state.abortController = new AbortController();
+  const requestController = new AbortController();
+  state.abortController = requestController;
   startWaitingTimer();
   updateUI();
   await renderMessages(true);
 
   try {
     const requestMessages = await buildRequestMessages(chat, userMsg);
-    await requestChatCompletion(requestMessages, assistantMsg);
+    await requestImageGeneration(requestMessages, assistantMsg, requestController.signal);
 
     state.isGenerating = false;
     state.abortController = null;
@@ -2013,9 +2046,7 @@ function saveFirstTimeApiKey() {
     return;
   }
   normalizeApiSettings();
-  const activeProfile = getActiveApiProfile();
-  if (activeProfile) activeProfile.apiKey = apiKey;
-  syncActiveApiProfileToSettings();
+  state.settings.apiKey = apiKey;
   saveToStorage();
   document.getElementById('firstTimeModal').style.display = 'none';
 }
@@ -2049,8 +2080,9 @@ async function addImage(file) {
     const dataUrl = await new Promise(resolve => {
       compressImage(e.target.result, UPLOAD_IMAGE_MAX_SIZE, UPLOAD_IMAGE_MAX_SIZE, UPLOAD_IMAGE_QUALITY, resolve);
     });
-    const storedName = file.name.replace(/(\.[^.]+)?$/, '_compressed.jpg');
-    const storedMime = 'image/jpeg';
+    const storedMime = getDataUrlMime(dataUrl) || file.type;
+    const extension = storedMime === 'image/jpeg' ? 'jpg' : storedMime.split('/')[1] || 'png';
+    const storedName = (file.name || 'image').replace(/(\.[^.]+)?$/, `_compressed.${extension}`);
 
     // Save image to IndexedDB and store ID
     const imageId = generateImageId();
@@ -2081,11 +2113,9 @@ function compressImage(dataUrl, maxWidth, maxHeight, quality, callback) {
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(0, 0, width, height);
     ctx.drawImage(img, 0, 0, width, height);
 
-    callback(canvas.toDataURL('image/jpeg', quality));
+    callback(canvas.toDataURL('image/png'));
   };
   img.onerror = () => callback(dataUrl);
   img.src = dataUrl;
@@ -2135,7 +2165,7 @@ function autoResize() {
 function updateUI() {
   const chat = getCurrentChat();
   document.getElementById('chatTitle').textContent = chat ? (chat.title || '新对话') : '新对话';
-  document.getElementById('modelBadge').textContent = DEFAULT_MODEL;
+  document.getElementById('modelBadge').textContent = getCurrentModel();
   document.getElementById('sendBtn').disabled = state.isGenerating;
   document.getElementById('stopBtn').className = state.isGenerating ? 'stop-btn visible' : 'stop-btn';
 }
@@ -2164,115 +2194,23 @@ function applyTheme() {
 }
 
 // ===== SETTINGS =====
-function startApiSettingsDraft() {
-  normalizeApiSettings();
-  apiSettingsDraft = {
-    profiles: state.settings.apiProfiles.map(profile => ({...profile})),
-    activeApiProfileId: state.settings.activeApiProfileId
-  };
-}
-
-function getDraftApiProfile() {
-  if (!apiSettingsDraft) return null;
-  return apiSettingsDraft.profiles.find(profile => profile.id === apiSettingsDraft.activeApiProfileId) || apiSettingsDraft.profiles[0] || null;
-}
-
-function renderApiProfileSelect() {
-  const select = document.getElementById('apiProfileSelect');
-  if (!select || !apiSettingsDraft) return;
-
-  select.innerHTML = '';
-  for (const profile of apiSettingsDraft.profiles) {
-    const option = document.createElement('option');
-    option.value = profile.id;
-    option.textContent = profile.name || '未命名配置';
-    select.appendChild(option);
-  }
-  select.value = apiSettingsDraft.activeApiProfileId;
-}
-
-function fillApiProfileForm() {
-  const profile = getDraftApiProfile();
-  if (!profile) return;
-
-  document.getElementById('apiProfileName').value = profile.name || '';
-  document.getElementById('apiBaseUrl').value = profile.apiUrl || DEFAULT_API_URL;
-  document.getElementById('apiKey').value = profile.apiKey || '';
-}
-
-function saveApiProfileFormToDraft() {
-  const profile = getDraftApiProfile();
-  if (!profile) return;
-
-  profile.name = document.getElementById('apiProfileName').value.trim() || '未命名配置';
-  profile.apiUrl = normalizeApiUrl(document.getElementById('apiBaseUrl').value);
-  profile.apiKey = document.getElementById('apiKey').value.trim();
-}
-
-function switchApiProfileForm(id) {
-  if (!apiSettingsDraft || !apiSettingsDraft.profiles.some(profile => profile.id === id)) return;
-  saveApiProfileFormToDraft();
-  apiSettingsDraft.activeApiProfileId = id;
-  renderApiProfileSelect();
-  fillApiProfileForm();
-}
-
-function addApiProfileForm() {
-  if (!apiSettingsDraft) startApiSettingsDraft();
-  saveApiProfileFormToDraft();
-
-  const profile = createApiProfile({
-    name: `配置 ${apiSettingsDraft.profiles.length + 1}`,
-    apiUrl: DEFAULT_API_URL,
-    apiKey: ''
-  });
-  apiSettingsDraft.profiles.push(profile);
-  apiSettingsDraft.activeApiProfileId = profile.id;
-  renderApiProfileSelect();
-  fillApiProfileForm();
-}
-
-function deleteApiProfileForm() {
-  if (!apiSettingsDraft || apiSettingsDraft.profiles.length <= 1) {
-    alert('至少保留一个 API 配置方案');
-    return;
-  }
-
-  const deletingId = apiSettingsDraft.activeApiProfileId;
-  apiSettingsDraft.profiles = apiSettingsDraft.profiles.filter(profile => profile.id !== deletingId);
-  apiSettingsDraft.activeApiProfileId = apiSettingsDraft.profiles[0].id;
-  renderApiProfileSelect();
-  fillApiProfileForm();
-}
-
-function commitApiSettingsDraft() {
-  if (!apiSettingsDraft) startApiSettingsDraft();
-  saveApiProfileFormToDraft();
-
-  state.settings.apiProfiles = apiSettingsDraft.profiles.map(profile => createApiProfile(profile));
-  state.settings.activeApiProfileId = apiSettingsDraft.activeApiProfileId;
-  normalizeApiSettings();
-  apiSettingsDraft = null;
-}
-
 function openSettings() {
-  startApiSettingsDraft();
-  renderApiProfileSelect();
-  fillApiProfileForm();
-  document.getElementById('modelName').value = DEFAULT_MODEL;
+  normalizeApiSettings();
+  document.getElementById('apiKey').value = getCurrentApiKey();
+  document.getElementById('modelName').value = getCurrentModel();
   document.getElementById('contextMode').value = normalizeContextMode(state.settings.contextMode);
   document.getElementById('systemPrompt').value = state.settings.systemPrompt || '';
   document.getElementById('settingsModal').style.display = 'flex';
 }
 
 function closeSettings() {
-  apiSettingsDraft = null;
   document.getElementById('settingsModal').style.display = 'none';
 }
 
 function saveSettings() {
-  commitApiSettingsDraft();
-  state.settings.model = DEFAULT_MODEL;
+  normalizeApiSettings();
+  state.settings.apiKey = document.getElementById('apiKey').value.trim();
+  state.settings.model = normalizeModel(document.getElementById('modelName').value);
   state.settings.contextMode = normalizeContextMode(document.getElementById('contextMode').value);
   state.settings.systemPrompt = document.getElementById('systemPrompt').value.trim();
   saveToStorage();
