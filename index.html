@@ -850,6 +850,8 @@ function getMessageImageIds(msg) {
 
 // ===== STATE =====
 const API_BASE_URL = 'https://e0b00642f591.nofx.one';
+// GitHub Pages: set this to your deployed Cloudflare Worker HTTPS address.
+const ONLINE_API_PROXY_URL = 'https://broken-paper-dc09image-v2-proxy.lanyu1420767140.workers.dev/';
 const IMAGE_GENERATION_API_URL = `${API_BASE_URL}/v1/images/generations`;
 const IMAGE_EDIT_API_URL = `${API_BASE_URL}/v1/images/edits`;
 const DEFAULT_MODEL = 'gpt-image-2.5-flare';
@@ -1631,8 +1633,12 @@ function escapeHtml(str) {
 // ===== API CALL =====
 let localApiProxyPromise = null;
 
+function isLocalApiPage() {
+  return ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
+}
+
 function hasLocalApiProxy() {
-  if (!['http:', 'https:'].includes(window.location.protocol)) return Promise.resolve(false);
+  if (!isLocalApiPage() || !['http:', 'https:'].includes(window.location.protocol)) return Promise.resolve(false);
   if (!localApiProxyPromise) {
     localApiProxyPromise = fetch('/api/health', { signal: AbortSignal.timeout(2000) })
       .then(async response => {
@@ -1643,6 +1649,22 @@ function hasLocalApiProxy() {
       .catch(() => false);
   }
   return localApiProxyPromise;
+}
+
+function getOnlineApiProxyUrl(target) {
+  const configured = ONLINE_API_PROXY_URL.trim();
+  if (!configured) return '';
+  let proxy;
+  try {
+    proxy = new URL(configured);
+    if (proxy.protocol !== 'https:' || proxy.username || proxy.password) throw new Error('Invalid proxy');
+  } catch {
+    throw new Error('在线中转地址配置无效，请网站维护者填写 Cloudflare Worker 的 HTTPS 地址');
+  }
+  if (target.origin !== API_BASE_URL || !['/v1/images/generations', '/v1/images/edits'].includes(target.pathname)) {
+    throw new Error('在线中转仅支持本站的图片生成和编辑接口');
+  }
+  return new URL(target.pathname, proxy).href;
 }
 
 async function fetchApiRequest(url, options) {
@@ -1656,15 +1678,18 @@ async function fetchApiRequest(url, options) {
 
   const useProxy = await hasLocalApiProxy();
   options.signal?.throwIfAborted();
+  const onlineProxyUrl = useProxy ? '' : getOnlineApiProxyUrl(target);
   const headers = new Headers(options.headers);
   if (useProxy) headers.set('X-API-URL', target.href);
   try {
-    return await fetch(useProxy ? '/api/proxy' : target.href, { ...options, headers });
+    return await fetch(useProxy ? '/api/proxy' : onlineProxyUrl || target.href, { ...options, headers });
   } catch (error) {
     if (error.name === 'AbortError' || options.signal?.aborted) throw error;
-    throw new Error(useProxy
-      ? '无法连接本地 API 转发服务，请确认 node server.js 仍在运行'
-      : '浏览器无法连接 API，可能是 CORS 预检被拒绝或网络异常。请运行 node server.js，并通过终端显示的本地地址打开页面后重试');
+    if (useProxy) throw new Error('无法连接本地 API 转发服务，请确认 node server.js 仍在运行');
+    if (onlineProxyUrl) throw new Error('无法连接在线中转服务，请检查 Cloudflare Worker 的部署状态、地址和网站来源配置');
+    throw new Error(isLocalApiPage()
+      ? '浏览器无法连接 API，可能是 CORS 预检被拒绝或网络异常。请运行 node server.js，并通过终端显示的本地地址打开页面后重试'
+      : 'API 未允许此网站跨域访问。GitHub Pages 需要配置 Cloudflare Worker 在线中转，或由 API 服务启用 CORS；请联系网站维护者');
   }
 }
 
